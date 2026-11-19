@@ -1,0 +1,2631 @@
+```html
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Peluru Kata - Selamatkan Dirimu dari Zombie</title>
+  <style>
+    :root {
+      --bg-dark: rgba(10, 14, 22, 0.88);
+      --panel-border: rgba(56, 189, 248, 0.35);
+      --accent: #38bdf8;
+      --amber: #f59e0b;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --text: #f8fafc;
+    }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: #05070b; color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      touch-action: none;
+    }
+    #game-canvas { display: block; width: 100vw; height: 100vh; }
+
+    #danger-vignette { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px rgba(239,68,68,0); z-index: 8; }
+    #danger-vignette.alarm { animation: alarmEdgeFlash 0.65s infinite alternate; }
+    @keyframes alarmEdgeFlash {
+      0% { box-shadow: inset 0 0 65px rgba(239,68,68,0.25); }
+      100% { box-shadow: inset 0 0 135px rgba(239,68,68,0.85); }
+    }
+
+    #mobile-controls { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 12; }
+    #mobile-controls.active { display: block; }
+    #joystick-zone { position: absolute; bottom: 22px; left: 24px; width: 136px; height: 136px; pointer-events: auto; }
+    #joystick-base { width: 100%; height: 100%; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.28); position: relative; backdrop-filter: blur(4px); }
+    #joystick-knob { width: 54px; height: 54px; border-radius: 50%; background: rgba(56,189,248,0.78); border: 2px solid #fff; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+    #look-zone { position: absolute; top: 0; right: 0; width: 55%; height: 100%; pointer-events: auto; }
+    #btn-shoot-mobile {
+      position: absolute; bottom: 30px; right: 28px; width: 88px; height: 88px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(239,68,68,0.9), rgba(153,27,27,0.92));
+      border: 3px solid rgba(255,255,255,0.75); color: #fff; font-weight: 800; font-size: 13px;
+      pointer-events: auto; box-shadow: 0 6px 24px rgba(239,68,68,0.5);
+    }
+    #btn-shoot-mobile:active { transform: scale(0.92); }
+
+    #hud { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 20; }
+    .hud-top-left { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .stat-card {
+      background: var(--bg-dark); border: 1px solid var(--panel-border); backdrop-filter: blur(8px);
+      border-radius: 10px; padding: 8px 14px; display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8; }
+    .stat-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .stat-value.ammo { color: var(--amber); }
+    .stat-value.zombies { color: var(--danger); }
+    .stat-value.boxes { color: var(--accent); }
+    .stat-value.timer { color: #34d399; }
+    .stat-value.timer.aggressive { color: #ef4444; animation: pulseBtn 0.9s infinite; }
+
+    .room-badge {
+      background: rgba(15,23,42,0.82); border-left: 3px solid var(--accent);
+      padding: 5px 12px; border-radius: 0 8px 8px 0; font-size: 12.5px; font-weight: 600; color: #e2e8f0; width: fit-content;
+    }
+    .hud-top-center {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;
+    }
+    #alarm-btn {
+      display: none; pointer-events: auto; background: #dc2626; color: #fff; border: 2px solid #fecaca;
+      border-radius: 12px; padding: 8px 18px; font-size: 14px; font-weight: 900; letter-spacing: 0.7px;
+      cursor: pointer; animation: alarmBlink 0.45s infinite alternate; z-index: 75;
+    }
+    #alarm-btn.visible { display: inline-block; }
+    @keyframes alarmBlink {
+      0% { background: #991b1b; transform: scale(1); box-shadow: 0 0 12px rgba(239,68,68,0.6); }
+      100% { background: #ef4444; transform: scale(1.06); box-shadow: 0 0 30px rgba(254,202,202,0.95); }
+    }
+    #status-toast {
+      background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.25s ease;
+    }
+    #status-toast.visible { opacity: 1; }
+
+    .hud-top-right { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; }
+    .minimap-wrap {
+      background: rgba(8,12,20,0.88); border: 1px solid var(--panel-border); border-radius: 10px;
+      padding: 5px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+    }
+    #minimap { width: 170px; height: 135px; display: block; border-radius: 6px; }
+    .minimap-legend { display: flex; gap: 8px; font-size: 10px; color: #cbd5e1; }
+    .legend-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+    .top-btn-row { display: flex; gap: 6px; }
+    .mini-btn {
+      background: var(--bg-dark); border: 1px solid rgba(255,255,255,0.2); color: #e2e8f0;
+      border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .mini-btn:hover { background: rgba(56,189,248,0.2); border-color: var(--accent); }
+
+    #crosshair { position: fixed; top: 50%; left: 50%; width: 24px; height: 24px; transform: translate(-50%,-50%); pointer-events: none; }
+    #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.9); box-shadow: 0 0 4px rgba(0,0,0,0.8); }
+    #crosshair::before { top: 11px; left: 2px; right: 2px; height: 2px; }
+    #crosshair::after { left: 11px; top: 2px; bottom: 2px; width: 2px; }
+    #crosshair.target-ammo::before, #crosshair.target-ammo::after { background: var(--amber); }
+    #crosshair.target-zombie::before, #crosshair.target-zombie::after { background: var(--danger); }
+
+    #hitmarker { position: fixed; top: 50%; left: 50%; width: 28px; height: 28px; transform: translate(-50%,-50%) rotate(45deg); pointer-events: none; opacity: 0; transition: opacity 0.1s; }
+    #hitmarker.active { opacity: 1; }
+    #hitmarker::before, #hitmarker::after { content: ''; position: absolute; background: #ef4444; }
+    #hitmarker::before { top: 13px; left: 0; right: 0; height: 2px; }
+    #hitmarker::after { left: 13px; top: 0; bottom: 0; width: 2px; }
+
+    #confirm-jawab-layer {
+      position: fixed; top: 56%; left: 50%; transform: translateX(-50%);
+      display: none; flex-direction: column; align-items: center; gap: 6px; pointer-events: auto; z-index: 30;
+    }
+    #confirm-jawab-layer.visible { display: flex; }
+    .ammo-prompt-label {
+      background: rgba(15,23,42,0.9); border: 1px solid rgba(245,158,11,0.55); color: #fde68a;
+      padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; pointer-events: none;
+    }
+    #btn-jawab-confirm {
+      background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827; border: 2px solid #fef3c7;
+      border-radius: 14px; padding: 12px 32px; font-size: 17px; font-weight: 900; cursor: pointer;
+      pointer-events: auto; touch-action: manipulation; box-shadow: 0 8px 25px rgba(245,158,11,0.55);
+      animation: pulseBtn 1.3s infinite;
+    }
+    @keyframes pulseBtn { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    .overlay-screen {
+      position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(15,23,42,0.9), rgba(3,6,12,0.96));
+      display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50;
+    }
+    .overlay-screen.hidden { display: none; }
+    .modal-card {
+      background: rgba(15,23,42,0.96); border: 1px solid rgba(56,189,248,0.35); border-radius: 20px;
+      padding: 24px 28px; max-width: 640px; width: 100%; max-height: 92vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.75); text-align: center;
+    }
+    .game-title {
+      font-size: clamp(28px, 5vw, 44px); font-weight: 900; margin: 0 0 4px;
+      background: linear-gradient(90deg, #38bdf8, #f59e0b, #ef4444);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 1.2px;
+    }
+    .subtitle { color: #e2e8f0; font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .author-tag { color: #94a3b8; font-size: 13px; margin: 0 0 20px; font-style: italic; }
+
+    .home-menu-stack { display: flex; flex-direction: column; gap: 12px; max-width: 320px; margin: 0 auto; }
+    .menu-btn-big {
+      width: 100%; padding: 14px 20px; border-radius: 14px; font-size: 16px; font-weight: 800;
+      cursor: pointer; border: 1px solid rgba(255,255,255,0.16); transition: transform 0.14s, filter 0.14s; touch-action: manipulation;
+    }
+    .menu-btn-big:hover { transform: translateY(-2px); filter: brightness(1.1); }
+    .menu-btn-primary { background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; border-color: rgba(125,211,252,0.5); box-shadow: 0 8px 24px rgba(37,99,235,0.4); }
+    .menu-btn-secondary { background: rgba(30,41,59,0.9); color: #f8fafc; }
+
+    .info-box {
+      background: rgba(30,41,59,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+      padding: 14px 18px; text-align: left; font-size: 13.5px; line-height: 1.6; color: #cbd5e1; margin-bottom: 16px;
+    }
+    .info-box ul { margin: 6px 0 0; padding-left: 18px; }
+    .formula-box {
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.45); border-radius: 12px;
+      padding: 12px 16px; text-align: left; font-size: 13.5px; line-height: 1.6; color: #fef3c7; margin-bottom: 18px;
+    }
+
+    .level-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin: 14px 0 18px; text-align: left; }
+    .level-card-btn {
+      background: rgba(30,41,59,0.88); border: 1px solid rgba(56,189,248,0.3); border-radius: 12px;
+      padding: 12px 14px; color: #f8fafc; cursor: pointer; text-align: left; transition: transform 0.12s, border-color 0.15s; touch-action: manipulation;
+    }
+    .level-card-btn:hover { border-color: var(--amber); background: rgba(56,189,248,0.14); transform: translateY(-2px); }
+    .level-card-btn.boss-card { border-color: rgba(239,68,68,0.65); background: rgba(69,10,10,0.5); }
+    .level-card-title { font-size: 15px; font-weight: 800; color: var(--accent); margin-bottom: 3px; }
+    .level-card-btn.boss-card .level-card-title { color: #fca5a5; }
+    .level-card-loc { font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 3px; }
+    .level-card-desc { font-size: 11.5px; color: #cbd5e1; line-height: 1.4; }
+
+    .primary-btn { background: linear-gradient(135deg, #0284c7, #2563eb); color: #fff; border: none; border-radius: 12px; padding: 12px 26px; font-size: 15px; font-weight: 700; cursor: pointer; touch-action: manipulation; }
+    .primary-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .secondary-btn { background: rgba(51,65,85,0.85); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 11px 22px; font-size: 15px; font-weight: 600; cursor: pointer; touch-action: manipulation; }
+    .secondary-btn:hover { background: rgba(71,85,105,0.95); }
+    .amber-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827; border: none; border-radius: 12px; padding: 12px 24px; font-size: 15px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+    .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    #btn-q-back.highlight {
+      background: linear-gradient(135deg, #f59e0b, #d97706); color: #111827; border-color: #fef3c7;
+      font-weight: 800; box-shadow: 0 6px 20px rgba(245,158,11,0.45); animation: pulseBtn 1.1s infinite;
+    }
+
+    #question-modal { background: rgba(2,6,15,0.45); z-index: 60; }
+    .question-box {
+      background: rgba(15,23,42,0.95); border: 2px solid var(--amber); border-radius: 18px;
+      padding: 18px 22px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 18px 50px rgba(0,0,0,0.78);
+    }
+    .q-badge {
+      display: inline-block; background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4);
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 6px;
+    }
+    .q-live-warn { font-size: 11px; color: #fca5a5; margin-bottom: 4px; }
+    .q-prompt { font-size: 26px; font-weight: 800; margin: 4px 0 12px; color: #fff; }
+    .q-prompt span.kata-dasar { color: var(--accent); text-transform: lowercase; }
+
+    .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .mc-btn {
+      display: flex; align-items: center; gap: 10px; background: rgba(30,41,59,0.95);
+      border: 2px solid rgba(148,163,184,0.35); color: #f8fafc; border-radius: 12px; padding: 11px 14px;
+      font-size: 16px; font-weight: 700; cursor: pointer; touch-action: manipulation; text-align: left;
+    }
+    .mc-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(56,189,248,0.16); }
+    .mc-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+    .mc-letter {
+      display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+      border-radius: 8px; background: rgba(56,189,248,0.22); color: #7dd3fc; font-size: 13px; font-weight: 800; flex-shrink: 0;
+    }
+    .mc-btn.wrong, .mc-btn.wrong:disabled { background: rgba(153,27,27,0.8); border-color: #ef4444; color: #fecaca; opacity: 1; }
+    .mc-btn.correct, .mc-btn.correct:disabled { background: rgba(21,128,61,0.88); border-color: #22c55e; color: #dcfce7; opacity: 1; }
+    #q-feedback { min-height: 20px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+    #q-feedback.error { color: #fca5a5; }
+    #q-feedback.success { color: #86efac; }
+
+    #rotate-warning {
+      position: fixed; inset: 0; background: rgba(5,7,11,0.96); z-index: 100; display: none;
+      flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px;
+    }
+    #rotate-warning.visible { display: flex; }
+    .rotate-icon { font-size: 48px; margin-bottom: 12px; animation: tiltPhone 1.8s infinite ease-in-out; }
+    @keyframes tiltPhone { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } }
+
+
+    /* ==========================================================
+       VISUAL UPGRADE — SURVIVAL / BIOHAZARD COMMAND INTERFACE
+       Hanya mengubah presentasi; logika permainan tetap.
+       ========================================================== */
+    :root {
+      --bg-dark: rgba(8, 13, 18, 0.94);
+      --panel-border: rgba(148, 163, 184, 0.24);
+      --accent: #a3e635;
+      --amber: #fbbf24;
+      --danger: #fb4545;
+      --success: #4ade80;
+      --text: #f1f5f9;
+    }
+
+    .overlay-screen {
+      overflow-y: auto;
+      background:
+        radial-gradient(ellipse at 16% 18%, rgba(132, 204, 22, .13), transparent 34%),
+        radial-gradient(ellipse at 88% 82%, rgba(220, 38, 38, .13), transparent 32%),
+        linear-gradient(135deg, rgba(3, 7, 10, .97), rgba(10, 17, 22, .96) 52%, rgba(3, 6, 9, .98));
+    }
+    .overlay-screen::before {
+      content: "CONTAINMENT ZONE  //  SURVIVAL PROTOCOL";
+      position: fixed; top: 17px; left: 22px;
+      color: rgba(190, 242, 100, .55); font: 800 10px/1.2 monospace;
+      letter-spacing: 2.2px; pointer-events: none;
+    }
+    .overlay-screen::after {
+      content: "BIOHAZARD ALERT  •  ME-01";
+      position: fixed; bottom: 16px; right: 22px;
+      color: rgba(248, 113, 113, .48); font: 800 9px/1.2 monospace;
+      letter-spacing: 1.8px; pointer-events: none;
+    }
+    .modal-card {
+      position: relative;
+      background:
+        linear-gradient(145deg, rgba(19, 29, 34, .98), rgba(7, 13, 17, .98));
+      border: 1px solid rgba(163, 230, 53, .3);
+      border-radius: 18px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.78), 0 0 0 1px rgba(255,255,255,.035) inset,
+                  0 0 36px rgba(132,204,22,.07);
+      text-align: center;
+    }
+    .modal-card::before {
+      content: "";
+      position: absolute; top: 0; left: 22px; right: 22px; height: 3px;
+      background: linear-gradient(90deg, transparent, #a3e635 22%, #fbbf24 70%, #ef4444, transparent);
+      border-radius: 0 0 8px 8px;
+    }
+    .game-title {
+      font-size: clamp(38px, 7vw, 66px);
+      line-height: .98; letter-spacing: 3px;
+      background: linear-gradient(180deg, #f7fee7 0%, #bef264 42%, #65a30d 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 5px 18px rgba(163,230,53,.18));
+      margin: 0 0 10px;
+    }
+    .subtitle { color: #dbe4e7; font-size: 16px; letter-spacing: .35px; }
+    .author-tag { color: #82939a; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 22px; }
+    .home-card { max-width: 790px; padding: 30px 34px; overflow: hidden; }
+    .home-layout {
+      display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(210px, .9fr);
+      gap: 22px; align-items: center; text-align: left;
+    }
+    .home-copy { position: relative; z-index: 1; }
+    .home-kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 10px; margin-bottom: 15px;
+      border: 1px solid rgba(163,230,53,.35); border-radius: 5px;
+      color: #bef264; background: rgba(101,163,13,.1);
+      font: 800 10px/1.2 monospace; letter-spacing: 1.7px;
+    }
+    .home-kicker::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: #a3e635; box-shadow: 0 0 12px #a3e635;
+    }
+    .home-description {
+      max-width: 430px; color: #aab9bf; font-size: 13px; line-height: 1.7;
+      margin: 12px 0 18px;
+    }
+    .home-art {
+      min-height: 250px; display: flex; align-items: center; justify-content: center;
+      position: relative; isolation: isolate;
+    }
+    .home-art::before {
+      content: ""; position: absolute; width: 220px; height: 220px; border-radius: 50%;
+      border: 1px solid rgba(163,230,53,.25);
+      box-shadow: 0 0 0 15px rgba(163,230,53,.025), 0 0 0 34px rgba(163,230,53,.02),
+                  0 0 65px rgba(163,230,53,.12) inset;
+      background: radial-gradient(circle, rgba(132,204,22,.12), rgba(3,7,10,.1) 68%);
+    }
+    .home-emblem {
+      position: relative; width: 154px; height: 154px; border-radius: 50%;
+      display: grid; place-items: center; font-size: 76px;
+      background: linear-gradient(145deg, rgba(31,41,36,.95), rgba(8,14,17,.98));
+      border: 2px solid rgba(190,242,100,.65);
+      box-shadow: 0 0 35px rgba(163,230,53,.2), 0 12px 35px rgba(0,0,0,.65);
+      text-shadow: 0 4px 15px rgba(0,0,0,.7);
+    }
+    .home-emblem::after {
+      content: "⚠"; position: absolute; right: -12px; bottom: 2px;
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border-radius: 50%; background: #991b1b; border: 2px solid #fecaca;
+      color: #fff; font-size: 22px; box-shadow: 0 0 22px rgba(239,68,68,.45);
+    }
+    .home-art-label {
+      position: absolute; bottom: 0; padding: 7px 12px;
+      border: 1px solid rgba(248,113,113,.35); border-radius: 4px;
+      background: rgba(69,10,10,.48); color: #fca5a5;
+      font: 800 9px/1.2 monospace; letter-spacing: 1.5px;
+    }
+    .home-menu-stack { max-width: 390px; margin: 0; gap: 10px; }
+    .menu-btn-big {
+      display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+      min-height: 52px; padding: 12px 16px; border-radius: 9px;
+      text-align: left; letter-spacing: .35px; font-size: 14px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(110deg, rgba(30,41,47,.98), rgba(15,23,29,.98));
+    }
+    .menu-btn-big .menu-icon {
+      display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px;
+      border-radius: 7px; background: rgba(255,255,255,.07); font-size: 17px;
+    }
+    .menu-btn-primary {
+      background: linear-gradient(105deg, #4d7c0f, #65a30d 55%, #3f6212);
+      border-color: rgba(190,242,100,.55); color: #f7fee7;
+      box-shadow: 0 8px 24px rgba(101,163,13,.24);
+    }
+    .menu-btn-primary .menu-icon { background: rgba(255,255,255,.16); }
+    .menu-btn-secondary { color: #e2e8f0; }
+    .menu-btn-big:hover { transform: translateX(4px); border-color: rgba(190,242,100,.5); }
+    .info-box {
+      background: linear-gradient(120deg, rgba(30,41,47,.88), rgba(15,23,29,.88));
+      border: 1px solid rgba(148,163,184,.18); border-left: 3px solid rgba(163,230,53,.65);
+      border-radius: 8px; color: #cbd5e1;
+    }
+    .formula-box {
+      background: rgba(120,53,15,.16); border: 1px solid rgba(251,191,36,.4);
+      border-left: 3px solid #fbbf24; border-radius: 8px;
+    }
+    .level-card-btn {
+      background: linear-gradient(135deg, rgba(30,41,47,.96), rgba(12,19,24,.96));
+      border: 1px solid rgba(163,230,53,.22); border-radius: 8px;
+    }
+    .level-card-title { color: #bef264; }
+    .level-card-loc { color: #fbbf24; }
+    .level-card-btn.boss-card { border-color: rgba(248,113,113,.55); background: linear-gradient(135deg, rgba(69,10,10,.55), rgba(20,10,12,.95)); }
+    .primary-btn {
+      background: linear-gradient(110deg, #4d7c0f, #65a30d); border: 1px solid rgba(190,242,100,.5);
+      box-shadow: 0 5px 18px rgba(101,163,13,.2);
+    }
+    .secondary-btn { background: rgba(30,41,47,.95); border: 1px solid rgba(148,163,184,.3); }
+    .amber-btn { background: linear-gradient(110deg, #d97706, #fbbf24); }
+    .q-badge { background: rgba(101,163,13,.14); color: #bef264; border-color: rgba(163,230,53,.4); }
+    .question-box {
+      background: linear-gradient(145deg, rgba(19,29,34,.99), rgba(7,13,17,.99));
+      border-color: rgba(251,191,36,.72);
+    }
+    #question-modal { background: rgba(1,5,8,.78); backdrop-filter: blur(5px); }
+    #btn-jawab-confirm {
+      background: linear-gradient(135deg, #fbbf24, #d97706); color: #1c1917;
+      border-color: #fef3c7;
+    }
+    .stat-card, .minimap-wrap {
+      background: rgba(5,10,14,.9); border-color: rgba(163,230,53,.25);
+    }
+    .room-badge { border-left-color: #a3e635; background: rgba(5,10,14,.9); }
+    .stat-value.boxes { color: #bef264; }
+    #crosshair.target-ammo::before, #crosshair.target-ammo::after { background: #fbbf24; }
+
+    @media (max-width: 620px) {
+      .home-card { padding: 24px 18px; }
+      .home-layout { grid-template-columns: 1fr; gap: 8px; text-align: center; }
+      .home-copy { display: flex; flex-direction: column; align-items: center; }
+      .home-art { min-height: 150px; grid-row: 1; }
+      .home-art::before { width: 135px; height: 135px; }
+      .home-emblem { width: 105px; height: 105px; font-size: 52px; }
+      .home-emblem::after { width: 32px; height: 32px; font-size: 17px; right: -8px; }
+      .home-art-label { bottom: -2px; }
+      .home-menu-stack { width: 100%; }
+      .home-description { margin: 8px 0 14px; }
+      .overlay-screen::before { top: 7px; left: 10px; font-size: 8px; }
+      .overlay-screen::after { bottom: 7px; right: 10px; font-size: 7px; }
+    }
+
+    @media (max-height: 480px) {
+      .modal-card { padding: 14px 18px; }
+      .game-title { font-size: 26px; }
+      .author-tag { margin-bottom: 10px; }
+      .home-menu-stack { gap: 8px; }
+      .menu-btn-big { padding: 10px 16px; font-size: 14px; }
+      .question-box { padding: 12px 16px; max-height: 90vh; overflow-y: auto; }
+      .q-prompt { font-size: 20px; margin: 2px 0 8px; }
+      .mc-grid { gap: 8px; margin-bottom: 8px; }
+      .mc-btn { padding: 8px 10px; font-size: 14px; }
+      .stat-card { padding: 5px 10px; gap: 10px; }
+      .stat-value { font-size: 15px; }
+      #minimap { width: 126px; height: 100px; }
+      .minimap-legend { font-size: 9px; gap: 5px; }
+      #joystick-zone { width: 112px; height: 112px; bottom: 14px; left: 16px; }
+      #btn-shoot-mobile { width: 76px; height: 76px; bottom: 18px; right: 20px; }
+      #alarm-btn { font-size: 12px; padding: 6px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="danger-vignette"></div>
+
+  <div id="mobile-controls">
+    <div id="joystick-zone"><div id="joystick-base"><div id="joystick-knob"></div></div></div>
+    <div id="look-zone"></div>
+    <button id="btn-shoot-mobile">TEMBAK</button>
+  </div>
+
+  <div id="hud">
+    <div class="hud-top-left">
+      <div class="stat-card">
+        <div class="stat-item"><span class="stat-label">Peluru</span><span class="stat-value ammo" id="hud-ammo">0</span></div>
+        <div class="stat-item"><span class="stat-label">Zombie</span><span class="stat-value zombies" id="hud-zombies">10/10</span></div>
+        <div class="stat-item"><span class="stat-label">Kotak</span><span class="stat-value boxes" id="hud-boxes">12</span></div>
+        <div class="stat-item"><span class="stat-label">Waktu</span><span class="stat-value timer" id="hud-timer">00:00</span></div>
+      </div>
+      <div class="room-badge" id="hud-room">Level 1 • Ruang Administrasi</div>
+    </div>
+
+    <div class="hud-top-center">
+      <button id="alarm-btn" type="button">⚠️ BAHAYA! ZOMBIE MENDEKAT!</button>
+      <div id="status-toast"></div>
+    </div>
+
+    <div class="hud-top-right">
+      <div class="minimap-wrap">
+        <canvas id="minimap" width="170" height="135"></canvas>
+        <div class="minimap-legend">
+          <span><i class="legend-dot" style="background:#38bdf8;"></i>Kamu</span>
+          <span><i class="legend-dot" style="background:#ef4444;"></i>Zombie</span>
+          <span><i class="legend-dot" style="background:#f59e0b;"></i>Peluru</span>
+        </div>
+      </div>
+      <div class="top-btn-row">
+        <button class="mini-btn" id="btn-toggle-touch">Mode Sentuh</button>
+        <button class="mini-btn" id="btn-fullscreen">Layar Penuh</button>
+        <button class="mini-btn" id="btn-pause">Jeda</button>
+      </div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="hitmarker"></div>
+
+    <div id="confirm-jawab-layer">
+      <div class="ammo-prompt-label">Kotak Peluru (+2 Peluru)</div>
+      <button id="btn-jawab-confirm" type="button">Jawab <span id="pc-key-hint">[E]</span></button>
+    </div>
+  </div>
+
+  <!-- 1. BERANDA -->
+  <div class="overlay-screen" id="home-screen">
+    <div class="modal-card home-card">
+      <div class="home-layout">
+        <div class="home-copy">
+          <div class="home-kicker">SURVIVAL TRAINING // ME-01</div>
+          <h1 class="game-title">PELURU<br>KATA</h1>
+          <p class="subtitle">Bertahan Hidup. Kumpulkan Peluru. Taklukkan Zombie.</p>
+          <p class="author-tag">A survival language mission • oleh Muhamad Patoni</p>
+          <p class="home-description">Kamu terjebak di zona wabah. Amunisi terbatas—temukan kotak peluru dan pecahkan soal pembentukan kata berimbuhan <strong>me-</strong> untuk bertahan hidup.</p>
+          <div class="home-menu-stack">
+            <button class="menu-btn-big menu-btn-primary" id="btn-menu-levels"><span class="menu-icon">🎯</span><span>PILIH MISI / LEVEL</span></button>
+            <button class="menu-btn-big menu-btn-secondary" id="btn-menu-howto"><span class="menu-icon">📋</span><span>CARA BERMAIN</span></button>
+            <button class="menu-btn-big menu-btn-secondary" id="btn-menu-about"><span class="menu-icon">🛡️</span><span>TENTANG GAME</span></button>
+          </div>
+        </div>
+        <div class="home-art" aria-hidden="true">
+          <div class="home-emblem">🧟</div>
+          <div class="home-art-label">⚠ ZONA TERKONTAMINASI ⚠</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. PILIH LEVEL (11 LEVEL) -->
+  <div class="overlay-screen hidden" id="level-screen">
+    <div class="modal-card" style="max-width: 780px;">
+      <h2 style="margin:0 0 4px; color:#38bdf8;">PILIH LEVEL (1 – 11)</h2>
+      <p style="margin:0 0 10px; font-size:13px; color:#94a3b8;">Setiap level memiliki lokasi wabah dan materi Imbuhan Me- yang berbeda</p>
+      <div class="level-grid" id="level-grid"></div>
+      <button class="secondary-btn" id="btn-levels-back">Kembali ke Beranda</button>
+    </div>
+  </div>
+
+  <!-- 3. HALAMAN MISI LEVEL -->
+  <div class="overlay-screen hidden" id="mission-screen">
+    <div class="modal-card">
+      <div class="q-badge" id="mission-badge">MISI — LEVEL 1</div>
+      <h2 style="margin:4px 0 4px;" id="mission-title">Imbuhan Me- + Kata Berawalan D &amp; C</h2>
+      <div style="font-size:13.5px; font-weight:700; color:#fbbf24; margin-bottom:12px;" id="mission-location">Lokasi: Rumah Sakit Terbengkalai</div>
+      <div class="info-box" id="mission-story"></div>
+      <div class="formula-box" id="mission-formula"></div>
+      <div class="btn-row">
+        <button class="secondary-btn" id="btn-mission-back">Pilih Level Lain</button>
+        <button class="primary-btn" id="btn-mission-start">Mulai</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. CARA BERMAIN -->
+  <div class="overlay-screen hidden" id="howto-screen">
+    <div class="modal-card">
+      <h2 style="margin:0 0 12px; color:#38bdf8;">CARA BERMAIN</h2>
+      <div class="info-box">
+        <strong>1. Mengumpulkan Peluru:</strong>
+        <ul>
+          <li>Setiap level bertempat di lokasi berbeda dengan <strong>12 kotak peluru</strong> dan <strong>10 zombie</strong> (semua terlihat pada peta radar).</li>
+          <li>Arahkan senjata ke kotak peluru hingga muncul tombol <strong>"Jawab"</strong>, lalu tekan tombol tersebut.</li>
+          <li>Pilih jawaban kata turunan berimbuhan <strong>Me-</strong> yang tepat dari 4 pilihan ganda untuk mendapatkan <strong>+2 peluru</strong>.</li>
+          <li>Jika salah menjawab, pilihan langsung terkunci. Tekan <strong>"Kembali"</strong> lalu pilih <strong>"Jawab"</strong> lagi untuk mendapatkan soal baru.</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <strong>2. Bertahan Hidup &amp; Batas Waktu 4 Menit:</strong>
+        <ul>
+          <li>Permainan <strong>tetap berjalan</strong> saat kamu memilih jawaban. Jika zombie mendekat, <strong>alarm merah akan berkedip</strong>.</li>
+          <li>Setiap zombie membutuhkan <strong>2 tembakan</strong> untuk tumbang.</li>
+          <li>Selesaikan secepatnya! Makin lama zombie makin agresif, dan setelah waktu <strong>lebih dari 4 menit</strong> semua zombie akan mengejarmu secara agresif (khusus Level 11, zombie sudah lebih agresif sejak awal!).</li>
+        </ul>
+      </div>
+      <div class="info-box">
+        <strong>3. Kontrol Permainan:</strong><br>
+        <strong>PC:</strong> WASD (Gerak), Shift (Lari), Mouse (Kamera), Klik Kiri / Spasi (Tembak), <strong>E</strong> (Jawab), <strong>A–D / 1–4</strong> (Pilih Jawaban).<br>
+        <strong>HP (Landscape):</strong> Joystick Kiri (Gerak), Geser Layar Kanan (Kamera), Tombol Tembak &amp; Jawab.
+      </div>
+      <button class="secondary-btn" id="btn-howto-back">Kembali ke Beranda</button>
+    </div>
+  </div>
+
+  <!-- 5. TENTANG -->
+  <div class="overlay-screen hidden" id="about-screen">
+    <div class="modal-card">
+      <h2 style="margin:0 0 14px; color:#38bdf8;">TENTANG</h2>
+      <div class="info-box" style="text-align:left; font-size:14px;">
+        <p style="margin-top:0;">
+          Game ini dibuat oleh <strong>Muhamad Patoni</strong>. Game ini ditujukan agar siswa mahir membuat kata turunan dari imbuhan <strong>Me-</strong> secara benar dengan cara yang menyenangkan.
+        </p>
+        <p>
+          Dalam game ini, kata dasar yang digunakan memang berupa kata-kata yang tidak lumrah digunakan atau bahkan tidak ada dalam bahasa Indonesia. Tujuannya agar siswa tidak menjawab hanya berdasarkan hafalan, tetapi karena benar-benar memahami rumus perubahannya.
+        </p>
+        <p>
+          Sebagai contoh, siswa bisa saja menjawab bahwa <strong>Me- + sapu</strong> menjadi <strong>menyapu</strong> bukan karena memahami perubahan huruf <strong>S</strong> menjadi <strong>NY</strong>, melainkan karena sudah sering mendengar kata tersebut.
+        </p>
+        <p>
+          Oleh karena itu, kata-kata yang sebenarnya tidak ada digunakan untuk benar-benar menguji pemahaman siswa tentang perubahan huruf dalam pembentukan kata turunan dengan imbuhan <strong>Me-</strong>.
+        </p>
+        <p style="margin-bottom:0;">
+          Untuk menghubungi pembuat game, silakan kirim email ke
+          <a href="mailto:muhamadpatoni19@gmail.com" style="color:#bef264; font-weight:700;">muhamadpatoni19@gmail.com</a>.
+        </p>
+      </div>
+      <button class="secondary-btn" id="btn-about-back">Kembali ke Beranda</button>
+    </div>
+  </div>
+
+  <!-- Question Modal -->
+  <div class="overlay-screen hidden" id="question-modal">
+    <div class="question-box">
+      <div class="q-badge" id="q-level-badge">SOAL IMBUHAN ME-</div>
+      <div class="q-live-warn">⏱️ Permainan tetap berjalan — waspadai alarm zombie!</div>
+      <div style="font-size: 13px; color: #94a3b8;">Pilih bentuk kata turunan yang tepat:</div>
+      <div class="q-prompt">Me + <span class="kata-dasar" id="q-word">daki</span> =</div>
+      <div class="mc-grid" id="mc-options"></div>
+      <div id="q-feedback"></div>
+      <div class="btn-row"><button class="secondary-btn" id="btn-q-back">Kembali</button></div>
+    </div>
+  </div>
+
+  <!-- Pause Screen -->
+  <div class="overlay-screen hidden" id="pause-screen">
+    <div class="modal-card">
+      <h2 style="margin-top:0;">PERMAINAN DIJEDA</h2>
+      <p class="subtitle" style="font-size:14px; color:#94a3b8; margin-bottom:16px;">Klik Lanjutkan untuk kembali beraksi.</p>
+      <div class="btn-row">
+        <button class="primary-btn" id="btn-resume">Lanjutkan</button>
+        <button class="amber-btn" id="btn-pause-retry">Ulangi</button>
+        <button class="secondary-btn" id="btn-pause-levels">Pilih Level Lain</button>
+        <button class="secondary-btn" id="btn-pause-home">Beranda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Screen -->
+  <div class="overlay-screen hidden" id="end-screen">
+    <div class="modal-card">
+      <h2 id="end-title" style="font-size: 28px; margin: 0 0 8px;">KAMU SELAMAT!</h2>
+      <p class="subtitle" id="end-desc" style="font-size:14px; color:#cbd5e1; margin-bottom:14px;"></p>
+      <div class="info-box" id="end-stats" style="text-align: center;"></div>
+      <div class="btn-row">
+        <button class="primary-btn" id="btn-end-retry">Ulangi</button>
+        <button class="amber-btn" id="btn-end-levels">Pilih Level Lain</button>
+        <button class="secondary-btn" id="btn-end-home">Beranda</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Landscape Warning -->
+  <div id="rotate-warning">
+    <div class="rotate-icon">📱</div>
+    <h2 style="margin:0 0 8px;">Putar ke Mode Landscape</h2>
+    <p style="color:#94a3b8; max-width:300px; font-size:14px;">Untuk pengalaman FPS terbaik di HP, silakan miringkan perangkat Anda ke posisi mendatar (landscape).</p>
+    <button class="secondary-btn" id="btn-dismiss-rotate" style="margin-top:12px;">Lanjut Tetap Ini</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    (() => {
+      'use strict';
+
+      const CELL_SIZE = 3.6;
+      const WALL_HEIGHT = 3.6;
+      const MAP_ROWS = 15;
+      const MAP_COLS = 19;
+
+      // ==========================================================
+      // 1. DEFINISI 11 LEVEL, LOKASI UNIK, & MATERI IMBUHAN ME-
+      // ==========================================================
+      const ALL_L1_3 = ['d', 'c', 'g', 'h', 'b', 'f', 'j', 'z'];
+      const ALL_L1_5 = ['d', 'c', 'g', 'h', 'b', 'f', 'j', 'z', 'l', 'm', 'n', 'r', 'w', 'y', 'k', 't'];
+      const ALL_L1_7 = ['d', 'c', 'g', 'h', 'b', 'f', 'j', 'z', 'l', 'm', 'n', 'r', 'w', 'y', 'k', 't', 's', 'p'];
+
+      const LEVELS = [
+        {
+          id: 1, name: 'Level 1', locationName: 'Rumah Sakit Terbengkalai',
+          subtitle: 'Imbuhan Me- + Kata Berawalan D & C', letters: ['d', 'c'], extraAggressive: false,
+          missionDesc: 'Rumah sakit besar ini telah lama ditinggalkan akibat wabah zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Tiap kata berawalan huruf <strong>D</strong> dan <strong>C</strong> yang diberi awalan <strong>Me-</strong>, akan memunculkan huruf <strong>N</strong>. Misalnya: <strong>Me + daki = MeNdaki</strong>, <strong>Me + capai = MeNcapai</strong>.”`,
+          theme: {
+            bg: 0x050a0d, fogColor: 0x050a0d, fogDensity: 0.042, ambientColor: 0x3b5563, ambientInt: 0.62,
+            wallTop: '#cbd5e1', wallBot: '#1e4e5f', wallTrim: '#0f172a', wallStyle: 'hospital',
+            floorA: '#94a3b8', floorB: '#64748b', floorStyle: 'checker', ceilColor: '#1e293b',
+            lights: [
+              { col: 2, row: 12, color: 0xa7f3d0, int: 1.0 }, { col: 9, row: 12, color: 0xbae6fd, int: 0.9, flicker: true },
+              { col: 15, row: 12, color: 0x7dd3fc, int: 0.85 }, { col: 9, row: 9, color: 0xe2e8f0, int: 0.8, flicker: true },
+              { col: 3, row: 7, color: 0x67e8f9, int: 0.8, flicker: true }, { col: 9, row: 7, color: 0xd1fae5, int: 0.95 },
+              { col: 15, row: 7, color: 0x99f6e4, int: 0.8 }, { col: 9, row: 5, color: 0xbae6fd, int: 0.75, flicker: true },
+              { col: 3, row: 2, color: 0x7dd3fc, int: 0.7 }, { col: 15, row: 2, color: 0xa5f3fc, int: 0.7, flicker: true }
+            ]
+          },
+          map: [
+            "###################","+#.Z...#....A#...Z.#".slice(1),"#...A.#..Z..#.....#","#.....#.....#..A..#",
+            "###.###..####.#####","#....A......A..Z..#","###.###..####.#####","#.Z.A.#..Z..#..Z..#",
+            "#.##..#..#.##..#.A#","#..A.....Z.....A..#","###.###..####.#####","#.....#.....#...A.#",
+            "#.S...#..A..#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Administrasi";
+            if (r >= 11 && c >= 7 && c <= 11) return "Ruang IGD";
+            if (r >= 11 && c >= 13) return "Apotek";
+            if (r === 9 || r === 5) return "Lorong Rumah Sakit";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Rawat Inap";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Operasi";
+            if (r >= 6 && r <= 8 && c >= 13) return "Laboratorium Medis";
+            if (r <= 3 && c <= 5) return "Ruang Rawat Inap VIP";
+            if (r <= 3 && c >= 7 && c <= 11) return "Bangsal Utama";
+            if (r <= 3 && c >= 13) return "Ruang Isolasi RS";
+            return "Koridor Medis";
+          }
+        },
+        {
+          id: 2, name: 'Level 2', locationName: 'Sekolah Terbengkalai',
+          subtitle: 'Imbuhan Me- + Kata Berawalan G & H', letters: ['g', 'h'], extraAggressive: false,
+          missionDesc: 'Sekolah menengah ini kini berantakan, redup, dan telah dikuasai oleh para zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Tiap kata berawalan huruf <strong>G</strong> dan <strong>H</strong> yang diberi awalan <strong>Me-</strong>, akan memunculkan huruf <strong>NG</strong>. Misalnya: <strong>Me + gali = MeNGgali</strong>, <strong>Me + hitung = MeNGhitung</strong>.”`,
+          theme: {
+            bg: 0x090806, fogColor: 0x090806, fogDensity: 0.04, ambientColor: 0x5c5344, ambientInt: 0.65,
+            wallTop: '#d6d3c4', wallBot: '#3f624d', wallTrim: '#292524', wallStyle: 'school',
+            floorA: '#a8a29e', floorB: '#78716c', floorStyle: 'tiles', ceilColor: '#292524',
+            lights: [
+              { col: 2, row: 12, color: 0xfde68a, int: 1.0 }, { col: 9, row: 12, color: 0xfef3c7, int: 0.75 },
+              { col: 15, row: 12, color: 0xfdba74, int: 0.45, flicker: true }, { col: 9, row: 9, color: 0xfde68a, int: 0.7, flicker: true },
+              { col: 3, row: 7, color: 0xfef08a, int: 0.6 }, { col: 9, row: 7, color: 0xfed7aa, int: 0.7 },
+              { col: 15, row: 7, color: 0x94a3b8, int: 0.4 }, { col: 9, row: 2, color: 0xfde68a, int: 0.9 },
+              { col: 3, row: 2, color: 0xfcd34d, int: 0.55, flicker: true }, { col: 15, row: 2, color: 0x67e8f9, int: 0.7 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#.Z...#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A..Z.....A...#","###.###..####.###.#","#.Z...#..Z..#..Z..#",
+            "#..A..#.....#.A...#","#.....A..Z.....A..#","###.###..####.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Belajar 1";
+            if (r >= 11 && c >= 7 && c <= 11) return "Kantin Sekolah";
+            if (r >= 11 && c >= 13) return "Lorong Loker";
+            if (r === 9 || r === 5) return "Lorong Kelas";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Belajar 2";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Guru";
+            if (r >= 6 && r <= 8 && c >= 13) return "Ruang Kepala Sekolah";
+            if (r <= 3 && c <= 5) return "Perpustakaan";
+            if (r <= 3 && c >= 7 && c <= 11) return "Aula Sekolah";
+            if (r <= 3 && c >= 13) return "Laboratorium IPA";
+            return "Koridor Sekolah";
+          }
+        },
+        {
+          id: 3, name: 'Level 3', locationName: 'Pusat Perbelanjaan / Mall',
+          subtitle: 'Imbuhan Me- + Kata Berawalan B, F, J & Z', letters: ['b', 'f', 'j', 'z'], extraAggressive: false,
+          missionDesc: 'Pusat perbelanjaan modern ini kini gelap, tidak terawat, dan dipenuhi zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Kata berawalan huruf <strong>B &amp; F</strong> memunculkan huruf <strong>M</strong> (<strong>Me + baca = MeMbaca</strong>, <strong>Me + foto = MeMfoto</strong>). Sedangkan kata berawalan <strong>J &amp; Z</strong> memunculkan huruf <strong>N</strong> (<strong>Me + jaga = MeNjaga</strong>, <strong>Me + ziarah = MeNziarah</strong>).”`,
+          theme: {
+            bg: 0x07060d, fogColor: 0x07060d, fogDensity: 0.035, ambientColor: 0x554b6e, ambientInt: 0.7,
+            wallTop: '#475569', wallBot: '#1e293b', wallTrim: '#06b6d4', wallStyle: 'mall',
+            floorA: '#cbd5e1', floorB: '#94a3b8', floorStyle: 'marble', ceilColor: '#111827',
+            lights: [
+              { col: 2, row: 12, color: 0xf472b6, int: 0.9 }, { col: 9, row: 12, color: 0xfbbf24, int: 0.95 },
+              { col: 15, row: 12, color: 0xfb923c, int: 0.85 }, { col: 9, row: 7, color: 0x38bdf8, int: 1.1, flicker: true },
+              { col: 2, row: 7, color: 0x4ade80, int: 0.85 }, { col: 16, row: 7, color: 0x60a5fa, int: 0.85 },
+              { col: 3, row: 2, color: 0xe879f9, int: 0.75, flicker: true }, { col: 9, row: 2, color: 0xfde047, int: 0.8 },
+              { col: 15, row: 2, color: 0x94a3b8, int: 0.6 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A.......Z..A.#","#...#.........#...#","#.Z.#....Z....#.Z.#",
+            "#..A#.........#A..#","#.....A..Z.....A..#","###.###...###.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Toko Pakaian";
+            if (r >= 11 && c >= 7 && c <= 11) return "Food Court";
+            if (r >= 11 && c >= 13) return "Restoran";
+            if (r >= 6 && r <= 8 && c <= 4) return "Supermarket";
+            if (r >= 6 && r <= 8 && c >= 14) return "Toko Elektronik";
+            if (r >= 4 && r <= 10 && c >= 5 && c <= 13) return "Lorong Utama Mall";
+            if (r <= 3 && c <= 5) return "Bioskop";
+            if (r <= 3 && c >= 7 && c <= 11) return "Atrium Utara";
+            if (r <= 3 && c >= 13) return "Gudang Barang";
+            return "Area Mall";
+          }
+        },
+        {
+          id: 4, name: 'Level 4', locationName: 'Hotel Mewah Terbengkalai',
+          subtitle: 'Imbuhan Me- + Kata Berawalan L, M, N, R, W & Y', letters: ['l', 'm', 'n', 'r', 'w', 'y'], extraAggressive: false,
+          missionDesc: 'Hotel mewah yang dahulu elegan kini berdebu, rusak, dan dikuasai zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Tiap kata berawalan <strong>L, M, N, R, W, dan Y</strong> yang diberi awalan <strong>Me-</strong>, bentuknya tetap <strong>Me-</strong> (tanpa huruf tambahan dan tanpa peluluhan). Misalnya: <strong>Me + lihat = Melihat</strong>, <strong>Me + rawat = Merawat</strong>.”`,
+          theme: {
+            bg: 0x0c0806, fogColor: 0x0c0806, fogDensity: 0.038, ambientColor: 0x6b5344, ambientInt: 0.65,
+            wallTop: '#581c2c', wallBot: '#3e2723', wallTrim: '#d4af37', wallStyle: 'hotel',
+            floorA: '#7f1d1d', floorB: '#450a0a', floorStyle: 'carpet', ceilColor: '#1f1612',
+            lights: [
+              { col: 2, row: 12, color: 0xfbbf24, int: 1.0 }, { col: 9, row: 12, color: 0xf59e0b, int: 1.2 },
+              { col: 15, row: 12, color: 0xfde68a, int: 0.85 }, { col: 9, row: 9, color: 0xd97706, int: 0.75, flicker: true },
+              { col: 3, row: 7, color: 0xfcd34d, int: 0.7 }, { col: 9, row: 7, color: 0xfbbf24, int: 0.7, flicker: true },
+              { col: 15, row: 7, color: 0xfdba74, int: 0.75 }, { col: 9, row: 2, color: 0xfbbf24, int: 1.25 },
+              { col: 3, row: 2, color: 0x94a3b8, int: 0.6 }, { col: 15, row: 2, color: 0xf59e0b, int: 0.75 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A#.#...#.#..A..#","#.....A..Z.....A..#","###.###...###.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Resepsionis";
+            if (r >= 11 && c >= 7 && c <= 11) return "Lobi Utama";
+            if (r >= 11 && c >= 13) return "Restoran Hotel";
+            if (r === 9 || r === 5) return "Koridor Kamar Tamu";
+            if (r >= 6 && r <= 8 && c <= 5) return "Kamar Tidur 101";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Kamar Tidur 102";
+            if (r >= 6 && r <= 8 && c >= 13) return "Dapur Hotel";
+            if (r <= 3 && c <= 5) return "Ruang Laundry";
+            if (r <= 3 && c >= 7 && c <= 11) return "Ballroom";
+            if (r <= 3 && c >= 13) return "Suite Mewah";
+            return "Koridor Hotel";
+          }
+        },
+        {
+          id: 5, name: 'Level 5', locationName: 'Laboratorium Penelitian Rahasia',
+          subtitle: 'Imbuhan Me- + Kata Berawalan K & T', letters: ['k', 't'], extraAggressive: false,
+          missionDesc: 'Laboratorium rahasia bawah tanah ini adalah tempat asal mula wabah zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Kata berawalan huruf <strong>K</strong> dan <strong>T</strong> (pola konsonan-vokal) akan <strong>LULUH</strong>: <strong>K → NG</strong> (<strong>Me + kiwi = MeNGiwi</strong>) dan <strong>T → N</strong> (<strong>Me + tuba = MeNuba</strong>).”`,
+          theme: {
+            bg: 0x03080e, fogColor: 0x03080e, fogDensity: 0.04, ambientColor: 0x1e4b5f, ambientInt: 0.68,
+            wallTop: '#1e293b', wallBot: '#0f172a', wallTrim: '#06b6d4', wallStyle: 'scifi',
+            floorA: '#1e293b', floorB: '#0f172a', floorStyle: 'grid', ceilColor: '#090d16',
+            lights: [
+              { col: 2, row: 12, color: 0x22d3ee, int: 1.0 }, { col: 9, row: 12, color: 0x38bdf8, int: 0.9 },
+              { col: 15, row: 12, color: 0xef4444, int: 1.0, pulse: true }, { col: 9, row: 9, color: 0x06b6d4, int: 0.85 },
+              { col: 3, row: 7, color: 0x22c55e, int: 1.0 }, { col: 9, row: 7, color: 0x38bdf8, int: 0.9 },
+              { col: 15, row: 7, color: 0xef4444, int: 1.1, pulse: true }, { col: 9, row: 5, color: 0x22d3ee, int: 0.85 },
+              { col: 3, row: 2, color: 0x4ade80, int: 1.0 }, { col: 15, row: 2, color: 0xef4444, int: 1.0, pulse: true }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###..####.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A.##...##..A...#","#.....A..Z.....A..#","###.###..####.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Kontrol";
+            if (r >= 11 && c >= 7 && c <= 11) return "Ruang Server";
+            if (r >= 11 && c >= 13) return "Ruang Generator";
+            if (r === 9 || r === 5) return "Lorong Lab Futuristik";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Eksperimen";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Observasi";
+            if (r >= 6 && r <= 8 && c >= 13) return "Ruang Isolasi Lab";
+            if (r <= 3 && c <= 5) return "Penyimpanan Spesimen";
+            if (r <= 3 && c >= 7 && c <= 11) return "Koridor Dekontaminasi";
+            if (r <= 3 && c >= 13) return "Ruang Biohazard";
+            return "Fasilitas Bawah Tanah";
+          }
+        },
+        {
+          id: 6, name: 'Level 6', locationName: 'Penjara Keamanan Tinggi',
+          subtitle: 'Imbuhan Me- + Kata Berawalan S & P', letters: ['s', 'p'], extraAggressive: false,
+          missionDesc: 'Para tahanan dan penjaga di penjara berkeamanan tinggi ini telah berubah menjadi zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Kata berawalan huruf <strong>S</strong> dan <strong>P</strong> (pola konsonan-vokal) akan <strong>LULUH</strong>: <strong>S → NY</strong> (<strong>Me + sipa = MeNYipa</strong>) dan <strong>P → M</strong> (<strong>Me + puwat = MeMuwat</strong>).”`,
+          theme: {
+            bg: 0x050608, fogColor: 0x050608, fogDensity: 0.044, ambientColor: 0x475569, ambientInt: 0.58,
+            wallTop: '#4b5563', wallBot: '#374151', wallTrim: '#111827', wallStyle: 'prison',
+            floorA: '#52525b', floorB: '#3f3f46', floorStyle: 'concrete', ceilColor: '#18181b',
+            lights: [
+              { col: 2, row: 12, color: 0xe2e8f0, int: 0.9 }, { col: 9, row: 12, color: 0x60a5fa, int: 0.85 },
+              { col: 15, row: 12, color: 0xfde68a, int: 0.75 }, { col: 9, row: 9, color: 0xf59e0b, int: 0.7, flicker: true },
+              { col: 3, row: 7, color: 0x94a3b8, int: 0.7, flicker: true }, { col: 9, row: 7, color: 0xfdba74, int: 0.8 },
+              { col: 15, row: 7, color: 0xef4444, int: 0.75, pulse: true }, { col: 3, row: 2, color: 0x94a3b8, int: 0.65 },
+              { col: 9, row: 2, color: 0x94a3b8, int: 0.65, flicker: true }, { col: 15, row: 2, color: 0x94a3b8, int: 0.65 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###..####.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A#.#...#.#..A..#","#.....A..Z.....A..#","###.###..####.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Penjaga";
+            if (r >= 11 && c >= 7 && c <= 11) return "Ruang Kontrol Keamanan";
+            if (r >= 11 && c >= 13) return "Ruang Kunjungan";
+            if (r === 9 || r === 5) return "Lorong Berpagar Besi";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Interogasi";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Kantin Tahanan";
+            if (r >= 6 && r <= 8 && c >= 13) return "Ruang Isolasi Penjara";
+            if (r <= 3 && c <= 5) return "Blok Sel A";
+            if (r <= 3 && c >= 7 && c <= 11) return "Blok Sel B";
+            if (r <= 3 && c >= 13) return "Blok Sel C";
+            return "Area Penjara";
+          }
+        },
+        {
+          id: 7, name: 'Level 7', locationName: 'Pabrik Industri Terbengkalai',
+          subtitle: 'Imbuhan Me- + Kata Berawalan K, T, S & P', letters: ['k', 't', 's', 'p'], extraAggressive: false,
+          missionDesc: 'Pabrik industri besar yang berkarat dan berdebu ini kini penuh dengan zombie.',
+          formulaHtml: `<strong>Untuk benar menjawab, pahami rumus ini:</strong><br>
+            “Tiap kata berawalan <strong>K, T, S, dan P</strong> (pola konsonan-vokal) huruf awalnya akan <strong>LULUH</strong>: <strong>K → NG</strong> (MeNGiwi), <strong>T → N</strong> (MeNuba), <strong>S → NY</strong> (MeNYipa), <strong>P → M</strong> (MeMuwat).”`,
+          theme: {
+            bg: 0x0a0705, fogColor: 0x0a0705, fogDensity: 0.036, ambientColor: 0x5c4738, ambientInt: 0.62,
+            wallTop: '#57534e', wallBot: '#431407', wallTrim: '#eab308', wallStyle: 'factory',
+            floorA: '#44403c', floorB: '#292524', floorStyle: 'concrete', ceilColor: '#1c1917',
+            lights: [
+              { col: 2, row: 12, color: 0xfb923c, int: 1.0 }, { col: 9, row: 12, color: 0x38bdf8, int: 0.85 },
+              { col: 15, row: 12, color: 0xfbbf24, int: 0.9, flicker: true }, { col: 4, row: 7, color: 0xf97316, int: 0.9 },
+              { col: 9, row: 7, color: 0xfde047, int: 0.95, flicker: true }, { col: 14, row: 7, color: 0xfb923c, int: 0.9 },
+              { col: 3, row: 2, color: 0x94a3b8, int: 0.7 }, { col: 9, row: 2, color: 0xf97316, int: 0.9, flicker: true },
+              { col: 15, row: 2, color: 0xfbbf24, int: 0.75 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A..Z.....A...#","#...#.........#...#","#.Z.....Z......Z..#",
+            "#..A#.........#A..#","#.....A..Z.....A..#","###.###...###.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Kantor Manajer";
+            if (r >= 11 && c >= 7 && c <= 11) return "Ruang Kontrol Produksi";
+            if (r >= 11 && c >= 13) return "Area Bongkar Muat";
+            if (r >= 5 && r <= 9) return "Ruang Produksi Utama";
+            if (r <= 3 && c <= 5) return "Gudang Bahan Baku";
+            if (r <= 3 && c >= 7 && c <= 11) return "Ruang Mesin";
+            if (r <= 3 && c >= 13) return "Ruang Pengemasan & Penyimpanan";
+            return "Area Pabrik";
+          }
+        },
+        {
+          id: 8, name: 'Level 8', locationName: 'Bandara Internasional Terbengkalai',
+          subtitle: 'Gabungan Materi Level 1–3 (D, C, G, H, B, F, J, Z)', letters: ALL_L1_3, extraAggressive: false,
+          missionDesc: 'Bandara internasional yang luas ini gelap, berantakan, dan ditinggalkan akibat wabah zombie.',
+          formulaHtml: `<strong>Rumus Level 8 (Gabungan Level 1 – 3):</strong><br>
+            • <strong>D, C, J, Z</strong> memunculkan <strong>N</strong> (men-): <em>MeNdaki, MeNcapai, MeNjaga, MeNziarah</em>.<br>
+            • <strong>G, H</strong> memunculkan <strong>NG</strong> (meng-): <em>MeNGgali, MeNGhitung</em>.<br>
+            • <strong>B, F</strong> memunculkan <strong>M</strong> (mem-): <em>MeMbaca, MeMfoto</em>.`,
+          theme: {
+            bg: 0x05080d, fogColor: 0x05080d, fogDensity: 0.032, ambientColor: 0x475569, ambientInt: 0.64,
+            wallTop: '#94a3b8', wallBot: '#1e293b', wallTrim: '#38bdf8', wallStyle: 'airport',
+            floorA: '#334155', floorB: '#1e293b', floorStyle: 'marble', ceilColor: '#0f172a',
+            lights: [
+              { col: 2, row: 12, color: 0xbae6fd, int: 0.95 }, { col: 9, row: 12, color: 0xfde68a, int: 0.85, flicker: true },
+              { col: 15, row: 12, color: 0x7dd3fc, int: 0.8 }, { col: 3, row: 7, color: 0x93c5fd, int: 0.85 },
+              { col: 9, row: 7, color: 0xe2e8f0, int: 1.0, flicker: true }, { col: 15, row: 7, color: 0xfbbf24, int: 0.85 },
+              { col: 3, row: 2, color: 0x64748b, int: 0.7 }, { col: 9, row: 2, color: 0x38bdf8, int: 0.9, flicker: true },
+              { col: 15, row: 2, color: 0x94a3b8, int: 0.7 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A..Z.....A...#","#...#.........#...#","#.Z.....Z......Z..#",
+            "#..A#.........#A..#","#.....A..Z.....A..#","###.###...###.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Check-In";
+            if (r >= 11 && c >= 7 && c <= 11) return "Pemeriksaan Keamanan";
+            if (r >= 11 && c >= 13) return "Kantor Maskapai";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Tunggu Penumpang";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Imigrasi";
+            if (r >= 6 && r <= 8 && c >= 13) return "Pengambilan Bagasi";
+            if (r === 5 || r === 9) return "Aula Terminal Bandara";
+            if (r <= 3 && c <= 5) return "Gudang Kargo";
+            if (r <= 3 && c >= 7 && c <= 11) return "Ruang Kontrol Bandara";
+            if (r <= 3 && c >= 13) return "Area Kargo Timur";
+            return "Terminal Bandara";
+          }
+        },
+        {
+          id: 9, name: 'Level 9', locationName: 'Stasiun Kereta Bawah Tanah',
+          subtitle: 'Gabungan Materi Level 1–5 (Termasuk K & T)', letters: ALL_L1_5, extraAggressive: false,
+          missionDesc: 'Stasiun bawah tanah ini gelap, lembap, sempit, dan hanya diterangi lampu darurat.',
+          formulaHtml: `<strong>Rumus Level 9 (Gabungan Level 1 – 5):</strong><br>
+            • <strong>D, C, J, Z</strong> → <strong>men-</strong> | <strong>G, H</strong> → <strong>meng-</strong> | <strong>B, F</strong> → <strong>mem-</strong> (tidak luluh).<br>
+            • <strong>L, M, N, R, W, Y</strong> → tetap <strong>me-</strong> (<em>Melihat, Memakan</em>).<br>
+            • <strong>K &amp; T</strong> → <strong>LULUH</strong>: <strong>K → NG</strong> (<em>MeNGiwi</em>), <strong>T → N</strong> (<em>MeNuba</em>).`,
+          theme: {
+            bg: 0x040507, fogColor: 0x040507, fogDensity: 0.046, ambientColor: 0x3f4756, ambientInt: 0.56,
+            wallTop: '#64748b', wallBot: '#1e293b', wallTrim: '#f59e0b', wallStyle: 'subway',
+            floorA: '#334155', floorB: '#1f2937', floorStyle: 'concrete', ceilColor: '#0b0f17',
+            lights: [
+              { col: 2, row: 12, color: 0xfbbf24, int: 0.85 }, { col: 9, row: 12, color: 0xf97316, int: 0.8, flicker: true },
+              { col: 15, row: 12, color: 0xef4444, int: 0.9, pulse: true }, { col: 9, row: 9, color: 0xf59e0b, int: 0.75, flicker: true },
+              { col: 3, row: 7, color: 0xef4444, int: 0.85, pulse: true }, { col: 9, row: 7, color: 0x38bdf8, int: 0.8 },
+              { col: 15, row: 7, color: 0xfbbf24, int: 0.8, flicker: true }, { col: 9, row: 5, color: 0xef4444, int: 0.85, pulse: true },
+              { col: 3, row: 2, color: 0x94a3b8, int: 0.65 }, { col: 15, row: 2, color: 0xf59e0b, int: 0.7 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###..####.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A..#.....#.A...#","#.....A..Z.....A..#","###.###..####.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Ruang Tiket";
+            if (r >= 11 && c >= 7 && c <= 11) return "Ruang Tunggu";
+            if (r >= 11 && c >= 13) return "Ruang Teknisi";
+            if (r === 9) return "Lorong Akses Penumpang";
+            if (r === 5) return "Terowongan Penghubung";
+            if (r >= 6 && r <= 8 && c <= 5) return "Peron Kereta Barat";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Kontrol Perjalanan";
+            if (r >= 6 && r <= 8 && c >= 13) return "Peron Kereta Timur";
+            if (r <= 3 && c <= 5) return "Gudang Peralatan";
+            if (r <= 3 && c >= 7 && c <= 11) return "Gerbong Kereta Terbengkalai";
+            if (r <= 3 && c >= 13) return "Terowongan Rel Gelap";
+            return "Stasiun Bawah Tanah";
+          }
+        },
+        {
+          id: 10, name: 'Level 10', locationName: 'Museum Sejarah Terbengkalai',
+          subtitle: 'Gabungan Materi Level 1–7 (Semua Huruf)', letters: ALL_L1_7, extraAggressive: false,
+          missionDesc: 'Museum megah yang sunyi dan berdebu ini kini penuh pajangan rusak serta zombie.',
+          formulaHtml: `<strong>Rumus Level 10 (Semua Materi Level 1 – 7):</strong><br>
+            • <strong>Tak Luluh:</strong> D,C,J,Z → <strong>men-</strong> | G,H → <strong>meng-</strong> | B,F → <strong>mem-</strong>.<br>
+            • <strong>Tetap:</strong> L,M,N,R,W,Y → <strong>me-</strong>.<br>
+            • <strong>Luluh:</strong> K → <strong>meng-</strong> | T → <strong>men-</strong> | S → <strong>meny-</strong> | P → <strong>mem-</strong>.`,
+          theme: {
+            bg: 0x090706, fogColor: 0x090706, fogDensity: 0.038, ambientColor: 0x5c4f41, ambientInt: 0.6,
+            wallTop: '#78716c', wallBot: '#292524', wallTrim: '#ca8a04', wallStyle: 'museum',
+            floorA: '#57534e', floorB: '#44403c', floorStyle: 'marble', ceilColor: '#1c1917',
+            lights: [
+              { col: 2, row: 12, color: 0xfde68a, int: 0.9 }, { col: 9, row: 12, color: 0xfbbf24, int: 1.05 },
+              { col: 15, row: 12, color: 0xd6d3d1, int: 0.7 }, { col: 9, row: 9, color: 0xf59e0b, int: 0.7, flicker: true },
+              { col: 3, row: 7, color: 0xfef08a, int: 0.75 }, { col: 9, row: 7, color: 0xfde68a, int: 0.85, flicker: true },
+              { col: 15, row: 7, color: 0xfdba74, int: 0.75 }, { col: 3, row: 2, color: 0x94a3b8, int: 0.6 },
+              { col: 9, row: 2, color: 0xfbbf24, int: 0.9 }, { col: 15, row: 2, color: 0x78716c, int: 0.6 }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###...###.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A#.#...#.#..A..#","#.....A..Z.....A..#","###.###...###.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Kantor Pengelola Museum";
+            if (r >= 11 && c >= 7 && c <= 11) return "Aula Utama Museum";
+            if (r >= 11 && c >= 13) return "Ruang Arsip";
+            if (r === 9 || r === 5) return "Galeri Penghubung";
+            if (r >= 6 && r <= 8 && c <= 5) return "Ruang Pameran Bersejarah";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Ruang Artefak";
+            if (r >= 6 && r <= 8 && c >= 13) return "Koleksi Senjata Kuno";
+            if (r <= 3 && c <= 5) return "Ruang Restorasi";
+            if (r <= 3 && c >= 7 && c <= 11) return "Diorama Sejarah";
+            if (r <= 3 && c >= 13) return "Gudang Koleksi";
+            return "Galeri Museum";
+          }
+        },
+        {
+          id: 11, name: 'Level 11', locationName: 'Kapal Pesiar Terbengkalai',
+          subtitle: 'Ujian Akhir (Level 1–7) • Zombie Lebih Agresif!', letters: ALL_L1_7, extraAggressive: true,
+          missionDesc: 'Kapal pesiar mewah ini terombang-ambing di tengah laut, lembap, rusak, dan zombienya jauh lebih agresif!',
+          formulaHtml: `<strong>Rumus Level 11 (Semua Materi Level 1 – 7 + Mode Ekstrem):</strong><br>
+            • Uji penguasaan seluruh aturan <strong>Me-</strong> (Tak Luluh, Tetap, dan Luluh <strong>K, T, S, P</strong>).<br>
+            • <span style="color:#fca5a5;"><strong>Peringatan:</strong> Zombie di kapal ini bergerak lebih cepat dan lebih agresif sejak awal!</span>`,
+          theme: {
+            bg: 0x040912, fogColor: 0x040912, fogDensity: 0.037, ambientColor: 0x3b5270, ambientInt: 0.65,
+            wallTop: '#1e3a5f', wallBot: '#451a03', wallTrim: '#eab308', wallStyle: 'cruise',
+            floorA: '#78350f', floorB: '#451a03', floorStyle: 'carpet', ceilColor: '#0f172a',
+            lights: [
+              { col: 2, row: 12, color: 0xfbbf24, int: 1.0 }, { col: 9, row: 12, color: 0xfde68a, int: 1.0, flicker: true },
+              { col: 15, row: 12, color: 0xfdba74, int: 0.85 }, { col: 9, row: 9, color: 0x38bdf8, int: 0.85 },
+              { col: 3, row: 7, color: 0xfcd34d, int: 0.75 }, { col: 9, row: 7, color: 0x22d3ee, int: 1.2 },
+              { col: 15, row: 7, color: 0xf43f5e, int: 0.9, pulse: true }, { col: 3, row: 2, color: 0xc084fc, int: 0.8 },
+              { col: 9, row: 2, color: 0x38bdf8, int: 0.95 }, { col: 15, row: 2, color: 0xef4444, int: 1.0, pulse: true }
+            ]
+          },
+          map: [
+            "###################","#.Z...#..A..#...Z.#","#...A.#..Z..#..A..#","#.....#.....#.....#",
+            "###.###..####.#####","#....A..Z.....A...#","###.###..####.#####","#.Z...#..Z..#..Z..#",
+            "#..A#.#...#.#..A..#","#.....A..Z.....A..#","###.###..####.#####","#.....#..A..#...A.#",
+            "#.S...#.....#...Z.#","#...A.#....Z#.....#","###################"
+          ],
+          getRoomName(c, r) {
+            if (r >= 11 && c <= 5) return "Lobi Kapal";
+            if (r >= 11 && c >= 7 && c <= 11) return "Restoran Kapal";
+            if (r >= 11 && c >= 13) return "Dapur Utama";
+            if (r === 9 || r === 5) return "Koridor Kabin Penumpang";
+            if (r >= 6 && r <= 8 && c <= 5) return "Kabin Penumpang";
+            if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return "Kolam Renang Indoor";
+            if (r >= 6 && r <= 8 && c >= 13) return "Kasino & Hiburan";
+            if (r <= 3 && c <= 5) return "Ruang Hiburan VIP";
+            if (r <= 3 && c >= 7 && c <= 11) return "Ruang Kendali Kapal";
+            if (r <= 3 && c >= 13) return "Ruang Mesin Kapal";
+            return "Dek Kapal Pesiar";
+          }
+        }
+      ];
+
+      // ==========================================================
+      // 2. AUDIO ENGINE PROSEDURAL
+      // ==========================================================
+      class SoundEngine {
+        constructor() { this.ctx = null; this.lastAlarmBeep = 0; }
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        }
+        playGunshot() {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime, bufferSize = this.ctx.sampleRate * 0.16;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate), data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.25));
+          const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+          const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1800, now); filter.frequency.exponentialRampToValueAtTime(250, now + 0.15);
+          const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.45, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.16);
+          noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination); noise.start(now);
+          const osc = this.ctx.createOscillator(), oscGain = this.ctx.createGain();
+          osc.type = 'triangle'; osc.frequency.setValueAtTime(160, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+          oscGain.gain.setValueAtTime(0.4, now); oscGain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+          osc.connect(oscGain); oscGain.connect(this.ctx.destination); osc.start(now); osc.stop(now + 0.13);
+        }
+        playEmptyClick() {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.type = 'square'; osc.frequency.setValueAtTime(900, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+          gain.gain.setValueAtTime(0.12, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now + 0.05);
+        }
+        playZombieHit(killed) {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.type = 'sawtooth'; osc.frequency.setValueAtTime(killed ? 140 : 190, now);
+          osc.frequency.exponentialRampToValueAtTime(killed ? 45 : 95, now + (killed ? 0.45 : 0.2));
+          gain.gain.setValueAtTime(0.22, now); gain.gain.exponentialRampToValueAtTime(0.001, now + (killed ? 0.46 : 0.22));
+          osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now + (killed ? 0.47 : 0.23));
+        }
+        playZombieAlert() {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.type = 'sawtooth'; osc.frequency.setValueAtTime(110, now);
+          osc.frequency.linearRampToValueAtTime(220, now + 0.14); osc.frequency.linearRampToValueAtTime(130, now + 0.32);
+          gain.gain.setValueAtTime(0.16, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+          osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now + 0.35);
+        }
+        playAlarmBeep(nowMs) {
+          if (!this.ctx || nowMs - this.lastAlarmBeep < 850) return;
+          this.lastAlarmBeep = nowMs;
+          const now = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.type = 'square'; osc.frequency.setValueAtTime(760, now); osc.frequency.setValueAtTime(580, now + 0.11);
+          gain.gain.setValueAtTime(0.09, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now); osc.stop(now + 0.23);
+        }
+        playSuccess() {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+            gain.gain.setValueAtTime(0.16, now + idx * 0.08); gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.22);
+            osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now + idx * 0.08); osc.stop(now + idx * 0.08 + 0.23);
+          });
+        }
+        playError() {
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [220, 175].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+            gain.gain.setValueAtTime(0.2, now + idx * 0.11); gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.11 + 0.14);
+            osc.connect(gain); gain.connect(this.ctx.destination); osc.start(now + idx * 0.11); osc.stop(now + idx * 0.11 + 0.15);
+          });
+        }
+      }
+      const sound = new SoundEngine();
+
+      // ==========================================================
+      // 3. GENERATOR SOAL IMBUHAN ME- OTOMATIS (MENDUKUNG LEVEL GABUNGAN)
+      // ==========================================================
+      const USED_WORDS = new Set();
+      let lastQuestionWord = '';
+
+      function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      function generateImbuhanQuestion(levelConfig) {
+        const firstConsonants = levelConfig.letters;
+        const vowels = ['a', 'i', 'u', 'e', 'o'];
+        const midConsonants = ['b', 'd', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'w', 'y'];
+        const endConsonants = ['h', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't'];
+
+        let word = '';
+        for (let attempt = 0; attempt < 150; attempt++) {
+          const c1 = firstConsonants[Math.floor(Math.random() * firstConsonants.length)];
+          const v1 = vowels[Math.floor(Math.random() * vowels.length)];
+          const c2 = midConsonants[Math.floor(Math.random() * midConsonants.length)];
+          const v2 = vowels[Math.floor(Math.random() * vowels.length)];
+          const c3 = Math.random() < 0.55 ? endConsonants[Math.floor(Math.random() * endConsonants.length)] : '';
+          const candidate = c1 + v1 + c2 + v2 + c3;
+          if (candidate !== lastQuestionWord && !USED_WORDS.has(candidate)) {
+            word = candidate; USED_WORDS.add(word); break;
+          }
+        }
+        if (!word) word = firstConsonants[0] + 'uwa' + (lastQuestionWord.endsWith('t') ? 'k' : 't');
+        lastQuestionWord = word;
+
+        const first = word[0];
+        const rest = word.slice(1);
+        let answer = '';
+        const distractorPool = [];
+
+        if (first === 'd' || first === 'c') {
+          answer = 'men' + word;
+          distractorPool.push('me' + word, 'meng' + word, 'mem' + word, 'men' + rest, 'menge' + word);
+        } else if (first === 'g' || first === 'h') {
+          answer = 'meng' + word;
+          distractorPool.push('me' + word, 'mem' + word, 'men' + word, 'meng' + rest, 'menge' + word, 'meny' + rest);
+        } else if (first === 'b' || first === 'f') {
+          answer = 'mem' + word;
+          distractorPool.push('me' + word, 'men' + word, 'meng' + word, 'mem' + rest, 'menge' + word);
+        } else if (first === 'j' || first === 'z') {
+          answer = 'men' + word;
+          distractorPool.push('me' + word, 'mem' + word, 'meng' + word, 'men' + rest, 'meny' + word);
+        } else if ('lmnrwy'.includes(first)) {
+          answer = 'me' + word;
+          distractorPool.push('men' + word, 'mem' + word, 'meng' + word, 'meny' + word, 'menge' + word);
+        } else {
+          // Huruf luluh K, T, S, P
+          let unassimilated = '';
+          if (first === 'k') { answer = 'meng' + rest; unassimilated = 'meng' + word; }
+          else if (first === 't') { answer = 'men' + rest; unassimilated = 'men' + word; }
+          else if (first === 's') { answer = 'meny' + rest; unassimilated = 'men' + word; }
+          else if (first === 'p') { answer = 'mem' + rest; unassimilated = 'mem' + word; }
+          distractorPool.push('me' + word, unassimilated);
+          distractorPool.push(...shuffleArray(['meng' + rest, 'men' + rest, 'meny' + rest, 'mem' + rest]));
+        }
+
+        const optionSet = new Set([answer]);
+        for (const cand of distractorPool) {
+          if (optionSet.size >= 4) break;
+          if (cand && cand !== answer) optionSet.add(cand);
+        }
+        return { word, answer, options: shuffleArray(Array.from(optionSet)) };
+      }
+
+      // ==========================================================
+      // 4. TEKSTUR PROSEDURAL BERTEMA PER LEVEL
+      // ==========================================================
+      function makeThemedWallTexture(theme) {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = theme.wallTop; ctx.fillRect(0, 0, 256, 156);
+        ctx.fillStyle = theme.wallBot; ctx.fillRect(0, 156, 256, 100);
+        ctx.fillStyle = theme.wallTrim; ctx.fillRect(0, 150, 256, 8); ctx.fillRect(0, 240, 256, 16);
+
+        if (theme.wallStyle === 'hospital' || theme.wallStyle === 'subway') {
+          ctx.strokeStyle = 'rgba(15,23,42,0.2)'; ctx.lineWidth = 2;
+          for (let i = 0; i < 256; i += 32) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+          }
+        } else if (theme.wallStyle === 'prison') {
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 2;
+          for (let y = 0; y < 256; y += 32) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke();
+            const off = (y / 32) % 2 === 0 ? 0 : 32;
+            for (let x = off; x < 256; x += 64) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 32); ctx.stroke(); }
+          }
+        } else if (theme.wallStyle === 'scifi') {
+          ctx.strokeStyle = '#0ea5e9'; ctx.lineWidth = 2; ctx.strokeRect(10, 16, 236, 120);
+          ctx.fillStyle = 'rgba(56,189,248,0.22)'; ctx.fillRect(20, 26, 216, 8);
+        } else if (theme.wallStyle === 'factory') {
+          for (let x = 0; x < 256; x += 16) {
+            ctx.fillStyle = x % 32 === 0 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.06)';
+            ctx.fillRect(x, 0, 8, 256);
+          }
+          ctx.fillStyle = '#eab308'; ctx.fillRect(0, 216, 256, 16);
+          ctx.fillStyle = '#18181b';
+          for (let x = -20; x < 280; x += 28) {
+            ctx.beginPath(); ctx.moveTo(x, 216); ctx.lineTo(x + 14, 216); ctx.lineTo(x + 2, 232); ctx.lineTo(x - 12, 232); ctx.closePath(); ctx.fill();
+          }
+        } else if (theme.wallStyle === 'hotel' || theme.wallStyle === 'museum') {
+          ctx.fillStyle = 'rgba(212,175,55,0.14)';
+          for (let x = 16; x < 256; x += 48) ctx.fillRect(x, 24, 18, 108);
+        } else if (theme.wallStyle === 'mall' || theme.wallStyle === 'airport') {
+          ctx.fillStyle = 'rgba(56,189,248,0.18)'; ctx.fillRect(14, 16, 228, 124);
+          ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.strokeRect(14, 16, 228, 124);
+        } else if (theme.wallStyle === 'cruise') {
+          ctx.fillStyle = 'rgba(234,179,8,0.18)'; ctx.fillRect(0, 146, 256, 6);
+          ctx.strokeStyle = '#eab308'; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(128, 78, 30, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillStyle = '#0c4a6e'; ctx.beginPath(); ctx.arc(128, 78, 26, 0, Math.PI * 2); ctx.fill();
+        }
+
+        for (let i = 0; i < 400; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.03)';
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
+        }
+        const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; return tex;
+      }
+
+      function makeThemedFloorTexture(theme) {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = theme.floorA; ctx.fillRect(0, 0, 256, 256);
+        if (theme.floorStyle === 'checker' || theme.floorStyle === 'marble') {
+          for (let y = 0; y < 256; y += 64) for (let x = 0; x < 256; x += 64) {
+            if (((x + y) / 64) % 2 === 0) { ctx.fillStyle = theme.floorB; ctx.fillRect(x, y, 64, 64); }
+          }
+        } else if (theme.floorStyle === 'grid') {
+          ctx.strokeStyle = 'rgba(6,182,212,0.25)'; ctx.lineWidth = 2;
+          for (let i = 0; i <= 256; i += 32) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+          }
+        } else if (theme.floorStyle === 'carpet') {
+          ctx.fillStyle = theme.floorB;
+          for (let y = 0; y < 256; y += 32) for (let x = 0; x < 256; x += 32) ctx.fillRect(x + 8, y + 8, 16, 16);
+        } else {
+          ctx.strokeStyle = theme.floorB; ctx.lineWidth = 3;
+          for (let i = 0; i < 256; i += 64) {
+            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+          }
+        }
+        for (let i = 0; i < 340; i++) { ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(Math.random() * 256, Math.random() * 256, 3, 3); }
+        const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(MAP_COLS, MAP_ROWS); return tex;
+      }
+
+      function makeThemedCeilingTexture(theme) {
+        const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = theme.ceilColor; ctx.fillRect(0, 0, 128, 128);
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 2; ctx.strokeRect(1, 1, 126, 126);
+        const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(MAP_COLS * 2, MAP_ROWS * 2); return tex;
+      }
+
+      function makeSignTexture(text, bgColor, fgColor) {
+        const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = bgColor; ctx.fillRect(0, 0, 256, 64);
+        ctx.strokeStyle = fgColor; ctx.lineWidth = 4; ctx.strokeRect(3, 3, 250, 58);
+        ctx.fillStyle = fgColor; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(text, 128, 33);
+        return new THREE.CanvasTexture(c);
+      }
+
+      // ==========================================================
+      // 5. PEMBANGUN PROPERTI 3D KHUSUS TIAP LEVEL (LEVEL 1–11)
+      // ==========================================================
+      let propColliders = [];
+      let dynamicLights = [];
+
+      function addSolidProp(mesh, x, z, w, d) {
+        mesh.position.x = x; mesh.position.z = z;
+        worldGroup.add(mesh);
+        if (w > 0 && d > 0) propColliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 });
+      }
+
+      function buildLevelProps(levelId) {
+        const g2w = gridToWorld;
+
+        if (levelId === 1) {
+          const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6, roughness: 0.4 });
+          const sheetMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85 });
+          const curtainMat = new THREE.MeshStandardMaterial({ color: 0x5eead4, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
+          const cabMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.4 });
+
+          [{ c:1,r:1,ox:-0.6,oz:-0.7 }, { c:5,r:1,ox:0.6,oz:-0.7 }, { c:10,r:1,ox:0.4,oz:-0.7 }, { c:1,r:7,ox:-0.6,oz:-0.6 }, { c:8,r:7,ox:-0.5,oz:-0.5 }, { c:10,r:11,ox:0.6,oz:-0.5 }].forEach(b => {
+            const p = g2w(b.c, b.r), g = new THREE.Group();
+            const f = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.35, 1.9), metalMat); f.position.y = 0.28;
+            const m = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.18, 1.8), sheetMat); m.position.y = 0.52;
+            const hb = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.85, 0.08), metalMat); hb.position.set(0, 0.48, -0.92);
+            const cur = new THREE.Mesh(new THREE.PlaneGeometry(1.85, 2.2), curtainMat); cur.rotation.y = Math.PI / 2; cur.position.set(0.72, 1.35, 0);
+            g.add(f, m, hb, cur); addSolidProp(g, p.x + b.ox, p.z + b.oz, 1.1, 1.9);
+          });
+          [g2w(4, 11), g2w(7, 5), g2w(14, 7)].forEach(pos => {
+            const wc = new THREE.Group();
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.55), new THREE.MeshStandardMaterial({ color: 0x1e293b })); seat.position.y = 0.5;
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.08), new THREE.MeshStandardMaterial({ color: 0x1e293b })); back.position.set(0, 0.78, -0.24);
+            const wL = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.06, 12), metalMat); wL.rotation.z = Math.PI / 2; wL.position.set(-0.32, 0.32, 0);
+            const wR = wL.clone(); wR.position.x = 0.32;
+            wc.add(seat, back, wL, wR); addSolidProp(wc, pos.x + 0.7, pos.z + 0.6, 0.7, 0.7);
+          });
+          [g2w(13, 12), g2w(17, 13), g2w(13, 7)].forEach(pos => {
+            const cab = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.0, 0.55), cabMat); body.position.y = 1.0;
+            const cV = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.42, 0.04), new THREE.MeshBasicMaterial({ color: 0xef4444 })); cV.position.set(0, 1.45, 0.28);
+            const cH = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.04), new THREE.MeshBasicMaterial({ color: 0xef4444 })); cH.position.set(0, 1.45, 0.28);
+            cab.add(body, cV, cH); addSolidProp(cab, pos.x - 0.8, pos.z - 0.9, 1.1, 0.6);
+          });
+        } else if (levelId === 2) {
+          const woodMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.75 });
+          const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 });
+          const boardMat = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.8 });
+          [g2w(1, 11), g2w(4, 12), g2w(1, 7), g2w(4, 8), g2w(8, 7), g2w(10, 8), g2w(8, 12), g2w(11, 1)].forEach(p => {
+            const g = new THREE.Group();
+            const top = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.65), woodMat); top.position.y = 0.72;
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.5), steelMat); leg.position.y = 0.35;
+            const chair = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), woodMat); chair.position.set(0, 0.23, 0.55);
+            g.add(top, leg, chair); addSolidProp(g, p.x - 0.65, p.z - 0.55, 1.0, 1.1);
+          });
+          [g2w(3, 11), g2w(3, 7), g2w(9, 7)].forEach(p => {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 0.08), boardMat); b.position.set(p.x, 1.75, p.z - 1.65); worldGroup.add(b);
+          });
+          [g2w(1, 1), g2w(5, 2), g2w(2, 3)].forEach(p => {
+            const s = new THREE.Group(), fr = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.55), woodMat); fr.position.y = 1.1;
+            const b1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.35, 0.58), new THREE.MeshStandardMaterial({ color: 0x1d4ed8 })); b1.position.y = 1.45;
+            s.add(fr, b1); addSolidProp(s, p.x - 0.7, p.z + 0.7, 1.4, 0.6);
+          });
+          [g2w(14, 1), g2w(16, 3)].forEach(p => {
+            const lab = new THREE.Group(), t = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.7), new THREE.MeshStandardMaterial({ color: 0x1e293b })); t.position.y = 0.45;
+            const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.32, 8), new THREE.MeshBasicMaterial({ color: 0x22d3ee })); fl.position.set(-0.3, 1.06, 0);
+            lab.add(t, fl); addSolidProp(lab, p.x + 0.6, p.z - 0.6, 1.5, 0.7);
+          });
+          [g2w(13, 11), g2w(17, 13)].forEach(p => {
+            const lk = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.1, 0.55), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5, metalness: 0.4 }));
+            lk.position.y = 1.05; addSolidProp(lk, p.x, p.z - 1.1, 1.8, 0.6);
+          });
+        } else if (levelId === 3) {
+          const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.7, roughness: 0.3 });
+          const glassMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.4 });
+          const escSpot = g2w(9, 6), esc = new THREE.Group();
+          const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 4.2), metalMat); ramp.position.y = 0.8; ramp.rotation.x = -0.34;
+          const rL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.85, 4.2), glassMat); rL.position.set(-0.72, 1.25, 0); rL.rotation.x = -0.34;
+          const rR = rL.clone(); rR.position.x = 0.72;
+          esc.add(ramp, rL, rR); addSolidProp(esc, escSpot.x - 1.5, escSpot.z, 1.6, 4.0);
+
+          [g2w(1, 11), g2w(16, 7), g2w(14, 6)].forEach(p => {
+            const sc = new THREE.Group(), base = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0x1e293b })); base.position.y = 0.35;
+            const gl = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.9, 0.66), glassMat); gl.position.y = 1.15;
+            sc.add(base, gl); addSolidProp(sc, p.x - 0.8, p.z - 0.8, 1.3, 0.75);
+          });
+          [g2w(8, 12), g2w(10, 12), g2w(14, 12), g2w(16, 13)].forEach(p => {
+            const tbl = new THREE.Group(), top = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 12), new THREE.MeshStandardMaterial({ color: 0xfef3c7 })); top.position.y = 0.75;
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.18, 0.75, 8), metalMat); post.position.y = 0.37;
+            tbl.add(top, post); addSolidProp(tbl, p.x + 0.5, p.z - 0.5, 1.1, 1.1);
+          });
+          [g2w(2, 6), g2w(2, 8)].forEach(p => {
+            const rk = new THREE.Group(), b = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.9, 0.65), new THREE.MeshStandardMaterial({ color: 0x334155 })); b.position.y = 0.95;
+            const pr = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.35, 0.7), new THREE.MeshStandardMaterial({ color: 0xef4444 })); pr.position.y = 1.4;
+            rk.add(b, pr); addSolidProp(rk, p.x - 0.6, p.z, 1.6, 0.7);
+          });
+          [
+            { col: 3, row: 10, text: 'PAKAIAN', bg: '#701a75', fg: '#f0abfc' },
+            { col: 9, row: 10, text: 'FOOD COURT', bg: '#7c2d12', fg: '#fdba74' },
+            { col: 2, row: 5, text: 'SUPERMARKET', bg: '#14532d', fg: '#86efac' },
+            { col: 16, row: 5, text: 'ELEKTRONIK', bg: '#1e3a8a', fg: '#93c5fd' },
+            { col: 3, row: 4, text: 'BIOSKOP', bg: '#7f1d1d', fg: '#fca5a5' }
+          ].forEach(s => {
+            const p = g2w(s.col, s.row);
+            const sm = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: makeSignTexture(s.text, s.bg, s.fg), side: THREE.DoubleSide }));
+            sm.position.set(p.x, WALL_HEIGHT - 0.55, p.z); worldGroup.add(sm);
+          });
+        } else if (levelId === 4) {
+          const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.25 });
+          const velvetMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.85 });
+          const mahoMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.6 });
+          const recPos = g2w(4, 11), rec = new THREE.Group();
+          const c = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.05, 0.8), mahoMat); c.position.y = 0.52;
+          const tr = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.1, 0.84), goldMat); tr.position.y = 1.02;
+          rec.add(c, tr); addSolidProp(rec, recPos.x + 0.3, recPos.z - 0.6, 2.2, 0.85);
+
+          [g2w(7, 12), g2w(11, 12), g2w(7, 1)].forEach(p => {
+            const sofa = new THREE.Group(), seat = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.45, 0.85), velvetMat); seat.position.y = 0.25;
+            const back = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.8, 0.22), velvetMat); back.position.set(0, 0.55, -0.32);
+            sofa.add(seat, back); addSolidProp(sofa, p.x, p.z + 0.6, 1.7, 0.9);
+          });
+          [g2w(9, 12), g2w(9, 2)].forEach(p => {
+            const ch = new THREE.Group(), cn = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), goldMat); cn.position.y = WALL_HEIGHT - 0.45;
+            const rg = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.06, 8, 18), goldMat); rg.rotation.x = Math.PI / 2; rg.position.y = WALL_HEIGHT - 0.95;
+            const bl = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfef08a })); bl.position.y = WALL_HEIGHT - 0.95;
+            ch.add(cn, rg, bl); worldGroup.add(ch);
+          });
+          [g2w(9, 9), g2w(9, 5), g2w(9, 12)].forEach(p => {
+            const rug = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.5), new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 }));
+            rug.rotation.x = -Math.PI / 2; rug.position.set(p.x, 0.015, p.z); worldGroup.add(rug);
+          });
+          [g2w(1, 7), g2w(15, 1)].forEach(p => {
+            const bed = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.55, 2.0), new THREE.MeshStandardMaterial({ color: 0xfef3c7 })); bed.position.y = 0.28;
+            addSolidProp(bed, p.x - 0.6, p.z - 0.5, 1.5, 2.0);
+          });
+          [g2w(17, 2), g2w(5, 7)].forEach(p => {
+            const w = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 0.6), mahoMat); w.position.y = 1.1;
+            addSolidProp(w, p.x + 0.6, p.z - 0.8, 1.1, 0.6);
+          });
+        } else if (levelId === 5) {
+          const techMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 });
+          const glassCyan = new THREE.MeshStandardMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.42 });
+          const bioGlow = new THREE.MeshBasicMaterial({ color: 0x4ade80 });
+          [g2w(1, 1), g2w(4, 1), g2w(1, 7), g2w(15, 7)].forEach(p => {
+            const tank = new THREE.Group();
+            const b = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.3, 12), techMat); b.position.y = 0.15;
+            const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 2.1, 12), glassCyan); cyl.position.y = 1.35;
+            const core = new THREE.Mesh(new THREE.BoxGeometry(0.32, 1.3, 0.22), bioGlow); core.position.y = 1.35;
+            const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.5, 0.25, 12), techMat); cap.position.y = 2.5;
+            tank.add(b, cyl, core, cap); addSolidProp(tank, p.x - 0.6, p.z - 0.6, 1.0, 1.0);
+          });
+          [g2w(4, 11), g2w(8, 11), g2w(10, 7), g2w(14, 11)].forEach(p => {
+            const desk = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.7), techMat); body.position.y = 0.45;
+            const scr = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.42, 0.06), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); scr.position.set(0, 1.15, -0.15);
+            desk.add(body, scr); addSolidProp(desk, p.x + 0.5, p.z - 0.7, 1.5, 0.75);
+          });
+          const srvPos = g2w(7, 13), srv = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.4, 0.8), techMat); srv.position.y = 1.2;
+          addSolidProp(srv, srvPos.x - 0.6, srvPos.z + 0.5, 1.0, 0.85);
+          const genPos = g2w(17, 13), gen = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 1.0), new THREE.MeshStandardMaterial({ color: 0xb91c1c, metalness: 0.6 })); gen.position.y = 0.7;
+          addSolidProp(gen, genPos.x + 0.4, genPos.z + 0.4, 1.5, 1.0);
+          const sgPos = g2w(8, 8), safeGlass = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.2, 0.1), glassCyan); safeGlass.position.y = 1.1;
+          addSolidProp(safeGlass, sgPos.x, sgPos.z, 1.8, 0.15);
+          [g2w(3, 4), g2w(8, 4), g2w(13, 4), g2w(3, 10)].forEach(p => {
+            const arch = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, 0.25, 0.35), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
+            arch.position.set(p.x, WALL_HEIGHT - 0.2, p.z); worldGroup.add(arch);
+          });
+        } else if (levelId === 6) {
+          const ironMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.85, roughness: 0.35 });
+          const benchMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
+          [g2w(2, 3), g2w(10, 3), g2w(15, 3)].forEach(p => {
+            const bars = new THREE.Group();
+            for (let x = -1.2; x <= 1.2; x += 0.35) {
+              const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, WALL_HEIGHT, 6), ironMat); bar.position.set(x, WALL_HEIGHT / 2, 0); bars.add(bar);
+            }
+            addSolidProp(bars, p.x, p.z + 1.25, 2.5, 0.15);
+          });
+          [g2w(8, 7), g2w(10, 7), g2w(14, 12)].forEach(p => {
+            const bench = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.45, 0.55), benchMat); bench.position.y = 0.23;
+            addSolidProp(bench, p.x, p.z + 0.6, 1.7, 0.6);
+          });
+          const gdPos = g2w(4, 11), gd = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 0.75), ironMat); gd.position.y = 0.45;
+          addSolidProp(gd, gdPos.x + 0.4, gdPos.z - 0.7, 1.6, 0.8);
+          [g2w(1, 1), g2w(7, 1), g2w(17, 1)].forEach(p => {
+            const bunk = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.9), ironMat); bunk.position.y = 0.28;
+            addSolidProp(bunk, p.x - 0.7, p.z - 0.6, 1.0, 1.9);
+          });
+          [g2w(3, 9), g2w(9, 9), g2w(15, 5)].forEach(p => {
+            const cctv = new THREE.Group(), cam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.38), ironMat);
+            const led = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), new THREE.MeshBasicMaterial({ color: 0xef4444 })); led.position.set(0, 0.05, 0.2);
+            cctv.add(cam, led); cctv.position.set(p.x, WALL_HEIGHT - 0.35, p.z); worldGroup.add(cctv);
+          });
+        } else if (levelId === 7) {
+          const rustMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.85, metalness: 0.4 });
+          const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.4 });
+          const yellowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 });
+          const convPos = g2w(9, 6), conv = new THREE.Group();
+          const belt = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.35, 1.1), new THREE.MeshStandardMaterial({ color: 0x18181b })); belt.position.y = 0.85;
+          const legs = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.85, 0.9), steelMat); legs.position.y = 0.42;
+          const bx = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0xb45309 })); bx.position.set(-0.9, 1.25, 0);
+          conv.add(belt, legs, bx); addSolidProp(conv, convPos.x, convPos.z, 3.8, 1.15);
+
+          [g2w(8, 1), g2w(10, 3), g2w(5, 7)].forEach(p => {
+            const m = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.8, 1.2), yellowMat); body.position.y = 0.9;
+            const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.4, 8), steelMat); pipe.position.set(0.4, 2.3, 0);
+            m.add(body, pipe); addSolidProp(m, p.x - 0.4, p.z - 0.5, 1.5, 1.2);
+          });
+          const contPos = g2w(15, 13), cont = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.3, 1.4), rustMat); cont.position.y = 1.15;
+          addSolidProp(cont, contPos.x + 0.4, contPos.z + 0.4, 2.6, 1.45);
+          [g2w(1, 1), g2w(15, 1)].forEach(p => {
+            const rk = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.3, 0.7), steelMat); rk.position.y = 1.15;
+            addSolidProp(rk, p.x - 0.5, p.z - 0.7, 1.5, 0.7);
+          });
+          [g2w(4, 11), g2w(13, 8), g2w(1, 6), g2w(17, 6)].forEach(p => {
+            const dr = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.95, 10), new THREE.MeshStandardMaterial({ color: Math.random() > 0.5 ? 0x1d4ed8 : 0xb91c1c, roughness: 0.7 }));
+            dr.position.y = 0.48; addSolidProp(dr, p.x + 0.8, p.z + 0.7, 0.75, 0.75);
+          });
+          [5, 9].forEach(row => {
+            const p = g2w(9, row), oh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 52, 8), rustMat);
+            oh.rotation.z = Math.PI / 2; oh.position.set(p.x, WALL_HEIGHT - 0.25, p.z); worldGroup.add(oh);
+          });
+        } else if (levelId === 8) {
+          // LEVEL 8: BANDARA INTERNASIONAL TERBENGKALAI
+          const deskMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.5 });
+          const chairMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.6 });
+          const steelMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.7, roughness: 0.3 });
+
+          // Konter check-in + layar
+          [g2w(1, 11), g2w(4, 11)].forEach(p => {
+            const g = new THREE.Group();
+            const cnt = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 0.75), deskMat); cnt.position.y = 0.5;
+            const mon = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.38, 0.06), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); mon.position.set(0, 1.2, -0.15);
+            g.add(cnt, mon); addSolidProp(g, p.x, p.z - 0.75, 1.7, 0.8);
+          });
+          // Mesin pemindai X-Ray di Pemeriksaan Keamanan
+          const scanPos = g2w(8, 11), scan = new THREE.Group();
+          const arch = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.1, 1.0), steelMat); arch.position.y = 1.05;
+          const tunnel = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.2, 1.06), new THREE.MeshStandardMaterial({ color: 0x020617 })); tunnel.position.y = 0.75;
+          scan.add(arch, tunnel); addSolidProp(scan, scanPos.x, scanPos.z - 0.4, 1.6, 1.0);
+
+          // Kursi tunggu penumpang
+          [g2w(2, 6), g2w(4, 6)].forEach(p => {
+            const row = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.55, 0.65), chairMat); row.position.y = 0.3;
+            addSolidProp(row, p.x, p.z + 0.5, 1.9, 0.7);
+          });
+          // Conveyor belt bagasi + koper
+          const bagPos = g2w(16, 6), bag = new THREE.Group();
+          const belt = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.55, 1.1), new THREE.MeshStandardMaterial({ color: 0x1e293b })); belt.position.y = 0.28;
+          const case1 = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.48), new THREE.MeshStandardMaterial({ color: 0xef4444 })); case1.position.set(-0.5, 0.78, 0);
+          bag.add(belt, case1); addSolidProp(bag, bagPos.x + 0.2, bagPos.z, 2.6, 1.1);
+
+          // Troli koper
+          [g2w(14, 12), g2w(11, 5)].forEach(p => {
+            const cart = new THREE.Group();
+            const base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.15, 0.65), steelMat); base.position.y = 0.22;
+            const lug = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.55, 0.45), new THREE.MeshStandardMaterial({ color: 0xf59e0b })); lug.position.y = 0.55;
+            cart.add(base, lug); addSolidProp(cart, p.x + 0.5, p.z + 0.5, 1.0, 0.7);
+          });
+          // Papan informasi penerbangan
+          [g2w(9, 10), g2w(9, 5)].forEach(p => {
+            const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: makeSignTexture('FLIGHT: DELAYED', '#020617', '#fbbf24'), side: THREE.DoubleSide }));
+            sign.position.set(p.x, WALL_HEIGHT - 0.6, p.z); worldGroup.add(sign);
+          });
+        } else if (levelId === 9) {
+          // LEVEL 9: STASIUN KERETA BAWAH TANAH
+          const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.75, roughness: 0.35 });
+          const trainMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.6, roughness: 0.45 });
+          const benchMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.7 });
+
+          // Mesin tiket otomatis
+          [g2w(1, 11), g2w(4, 11)].forEach(p => {
+            const tm = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.9, 0.65), steelMat); body.position.y = 0.95;
+            const scr = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.45, 0.05), new THREE.MeshBasicMaterial({ color: 0x38bdf8 })); scr.position.set(0, 1.25, 0.34);
+            tm.add(body, scr); addSolidProp(tm, p.x, p.z - 0.8, 0.95, 0.7);
+          });
+          // Bangku penumpang
+          [g2w(4, 7), g2w(17, 7), g2w(8, 12)].forEach(p => {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.48, 0.6), benchMat); b.position.y = 0.25;
+            addSolidProp(b, p.x, p.z + 0.55, 1.7, 0.65);
+          });
+          // Tiang penyangga stasiun
+          [g2w(2, 9), g2w(14, 9), g2w(11, 5)].forEach(p => {
+            const col = new THREE.Mesh(new THREE.BoxGeometry(0.55, WALL_HEIGHT, 0.55), steelMat); col.position.y = WALL_HEIGHT / 2;
+            addSolidProp(col, p.x, p.z + 0.9, 0.6, 0.6);
+          });
+          // Gerbong kereta terbengkalai
+          const trPos = g2w(11, 2), tr = new THREE.Group();
+          const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.5, 4.4), trainMat); body.position.y = 1.3;
+          const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.25, 4.44), new THREE.MeshStandardMaterial({ color: 0xd97706 })); stripe.position.y = 1.05;
+          const win = new THREE.Mesh(new THREE.BoxGeometry(1.34, 0.7, 3.2), new THREE.MeshStandardMaterial({ color: 0x020617 })); win.position.y = 1.75;
+          tr.add(body, stripe, win); addSolidProp(tr, trPos.x + 0.5, trPos.z, 1.35, 4.4);
+          // Panel listrik
+          [g2w(13, 12), g2w(5, 1)].forEach(p => {
+            const pnl = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.9, 0.5), new THREE.MeshStandardMaterial({ color: 0x334155 })); pnl.position.y = 0.95;
+            addSolidProp(pnl, p.x - 0.6, p.z - 0.8, 0.95, 0.55);
+          });
+          // Papan jadwal perjalanan
+          [g2w(9, 10), g2w(3, 5)].forEach(p => {
+            const sm = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.65), new THREE.MeshBasicMaterial({ map: makeSignTexture('KERETA: BERHENTI', '#18181b', '#f97316'), side: THREE.DoubleSide }));
+            sm.position.set(p.x, WALL_HEIGHT - 0.55, p.z); worldGroup.add(sm);
+          });
+        } else if (levelId === 10) {
+          // LEVEL 10: MUSEUM SEJARAH TERBENGKALAI
+          const woodMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 });
+          const stoneMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.8 });
+          const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.85, roughness: 0.25 });
+          const glassMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, transparent: true, opacity: 0.35 });
+
+          // Lemari pajangan kaca dengan artefak emas
+          [g2w(4, 7), g2w(11, 7), g2w(13, 7), g2w(17, 7)].forEach((p, idx) => {
+            const g = new THREE.Group();
+            const ped = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.85, 1.0), woodMat); ped.position.y = 0.42;
+            const gl = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.0, 0.92), glassMat); gl.position.y = 1.35;
+            const art = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), goldMat); art.position.y = 1.3;
+            if (idx % 2 === 1) gl.rotation.y = 0.15; // sebagian pajangan tampak miring/rusak
+            g.add(ped, gl, art); addSolidProp(g, p.x, p.z - 0.5, 1.05, 1.05);
+          });
+          // Patung di Aula Utama Museum
+          [g2w(7, 12), g2w(11, 12)].forEach(p => {
+            const st = new THREE.Group();
+            const pl = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.9, 1.0), stoneMat); pl.position.y = 0.45;
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.36, 1.1, 8), stoneMat); torso.position.y = 1.45;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), stoneMat); head.position.y = 2.15;
+            st.add(pl, torso, head); addSolidProp(st, p.x, p.z + 0.5, 1.0, 1.0);
+          });
+          // Diorama sejarah
+          const dioPos = g2w(10, 1), dio = new THREE.Group();
+          const tbl = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.85, 1.3), woodMat); tbl.position.y = 0.42;
+          const hill = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.45, 6), new THREE.MeshStandardMaterial({ color: 0x3f6212 })); hill.position.set(-0.4, 1.05, 0);
+          dio.add(tbl, hill); addSolidProp(dio, dioPos.x, dioPos.z - 0.4, 2.2, 1.35);
+          // Rak koleksi & arsip
+          [g2w(13, 12), g2w(17, 13), g2w(15, 1)].forEach(p => {
+            const rk = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.2, 0.65), woodMat); rk.position.y = 1.1;
+            addSolidProp(rk, p.x, p.z - 0.8, 1.3, 0.65);
+          });
+          // Lukisan berbingkai emas di dinding
+          [g2w(9, 13), g2w(3, 13)].forEach(p => {
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.3, 0.08), goldMat); frame.position.set(p.x, 1.85, p.z + 1.65); worldGroup.add(frame);
+            const art = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.05, 0.1), new THREE.MeshStandardMaterial({ color: 0x7c2d12 })); art.position.set(p.x, 1.85, p.z + 1.64); worldGroup.add(art);
+          });
+        } else if (levelId === 11) {
+          // LEVEL 11: KAPAL PESIAR TERBENGKALAI
+          const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8, roughness: 0.25 });
+          const velvetMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.8 });
+          const navyMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.5 });
+
+          // Kolam renang indoor bercahaya di tengah kapal
+          const poolPos = g2w(9, 7);
+          const water = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.0, 2.4),
+            new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.72 })
+          );
+          water.rotation.x = -Math.PI / 2; water.position.set(poolPos.x, 0.025, poolPos.z); worldGroup.add(water);
+
+          // Sofa mewah & meja makan restoran kapal
+          [g2w(1, 11), g2w(4, 11)].forEach(p => {
+            const sf = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.65, 0.85), velvetMat); sf.position.y = 0.33;
+            addSolidProp(sf, p.x, p.z - 0.7, 1.6, 0.9);
+          });
+          [g2w(7, 12), g2w(10, 11)].forEach(p => {
+            const tbl = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.25, 0.8, 12), new THREE.MeshStandardMaterial({ color: 0xfef3c7 })); tbl.position.y = 0.4;
+            addSolidProp(tbl, p.x, p.z + 0.5, 1.3, 1.3);
+          });
+          // Meja Kasino hijau
+          const casPos = g2w(17, 7), cas = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.82, 1.0), new THREE.MeshStandardMaterial({ color: 0x15803d })); cas.position.y = 0.41;
+          addSolidProp(cas, casPos.x + 0.4, casPos.z - 0.5, 1.4, 1.0);
+          // Peralatan navigasi & kemudi kapal di Anjungan
+          [g2w(7, 1), g2w(11, 1)].forEach(p => {
+            const nav = new THREE.Group(), c = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 0.7), navyMat); c.position.y = 0.5;
+            const helm = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.05, 6, 12), goldMat); helm.position.set(0, 1.15, 0.36);
+            const radar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.38, 0.08), new THREE.MeshBasicMaterial({ color: 0x22c55e })); radar.position.set(0, 1.2, -0.15);
+            nav.add(c, helm, radar); addSolidProp(nav, p.x, p.z - 0.6, 1.3, 0.75);
+          });
+          // Mesin kapal raksasa di Ruang Mesin
+          [g2w(14, 1), g2w(17, 3)].forEach(p => {
+            const eng = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.9, 1.2), new THREE.MeshStandardMaterial({ color: 0x7c2d12, metalness: 0.6 })); eng.position.y = 0.95;
+            addSolidProp(eng, p.x + 0.4, p.z - 0.5, 1.5, 1.2);
+          });
+        }
+      }
+
+      // ==========================================================
+      // 6. SCENE THREE.JS & STATE GAME
+      // ==========================================================
+      const canvas = document.getElementById('game-canvas');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x070a10);
+      scene.fog = new THREE.FogExp2(0x070a10, 0.038);
+
+      const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 80);
+      camera.rotation.order = 'YXZ';
+
+      const flashlight = new THREE.SpotLight(0xfff4e0, 2.35, 28, Math.PI / 4.3, 0.45, 1.25);
+      flashlight.position.set(0, 0, 0); flashlight.target.position.set(0, 0, -1);
+      camera.add(flashlight); camera.add(flashlight.target); scene.add(camera);
+
+      const ambientLight = new THREE.AmbientLight(0x4b5c78, 0.65); scene.add(ambientLight);
+      const hemiLight = new THREE.HemisphereLight(0x7c93b8, 0x1a1e24, 0.4); scene.add(hemiLight);
+
+      const weaponGroup = new THREE.Group();
+      const gunBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.75 });
+      const gunSlideMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.25, metalness: 0.85 });
+      const gunGlowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+      const gunGrip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.08), gunBodyMat); gunGrip.position.set(0, -0.07, 0.05); gunGrip.rotation.x = 0.22;
+      const gunFrame = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.045, 0.28), gunBodyMat); gunFrame.position.set(0, -0.01, -0.04);
+      const gunSlide = new THREE.Mesh(new THREE.BoxGeometry(0.058, 0.048, 0.29), gunSlideMat); gunSlide.position.set(0, 0.03, -0.04);
+      const rearSight = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.015, 0.015), gunGlowMat); rearSight.position.set(0, 0.06, 0.08);
+      const muzzleFlash = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.18, 6), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.9 }));
+      muzzleFlash.rotation.x = -Math.PI / 2; muzzleFlash.position.set(0, 0.025, -0.25); muzzleFlash.visible = false;
+      const muzzleLight = new THREE.PointLight(0xfbbf24, 0, 8); muzzleLight.position.set(0, 0.03, -0.3);
+
+      weaponGroup.add(gunGrip, gunFrame, gunSlide, rearSight, muzzleFlash, muzzleLight);
+      weaponGroup.position.set(0.24, -0.22, -0.42); camera.add(weaponGroup);
+
+      let worldGroup = new THREE.Group(); scene.add(worldGroup);
+      let wallMeshes = [], ammoBoxes = [], zombies = [], particles = [];
+
+      const player = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, radius: 0.55, height: 1.65, speed: 4.8, sprintSpeed: 6.5, ammo: 0, bobTime: 0 };
+      const gameState = {
+        currentLevel: LEVELS[0], started: false, paused: false, questionOpen: false, questionLocked: false, ended: false,
+        kills: 0, totalZombies: 10, totalBoxes: 12, shotsFired: 0, shotsHit: 0, questionsAnswered: 0,
+        playTimeSec: 0, aggressiveMode: false, targetedBox: null, lastValidBox: null, targetGraceTimer: 0,
+        activeBox: null, currentQuestion: null, recoil: 0, muzzleTimer: 0, emergencySpawned: false
+      };
+
+      // ==========================================================
+      // 7. PEMBANGUNAN DUNIA BERDASARKAN LEVEL AKTIF
+      // ==========================================================
+      function gridToWorld(col, row) {
+        return { x: (col - MAP_COLS / 2 + 0.5) * CELL_SIZE, z: (row - MAP_ROWS / 2 + 0.5) * CELL_SIZE };
+      }
+      function worldToGrid(x, z) {
+        return { col: Math.floor(x / CELL_SIZE + MAP_COLS / 2), row: Math.floor(z / CELL_SIZE + MAP_ROWS / 2) };
+      }
+      function isWallCell(col, row) {
+        const map = gameState.currentLevel.map;
+        if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return true;
+        return map[row][col] === '#';
+      }
+
+      function createAmmoBoxMesh(x, z) {
+        const group = new THREE.Group();
+        const boxMat = new THREE.MeshStandardMaterial({ color: 0x3f4d36, roughness: 0.5, metalness: 0.4, emissive: 0x451a03, emissiveIntensity: 0.35 });
+        const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.55, roughness: 0.3 });
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.48, 0.52), boxMat); base.position.y = 0.24;
+        const lid = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.56), boxMat); lid.position.y = 0.5;
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.08, 0.18), stripeMat); stripe.position.y = 0.34;
+        const glow = new THREE.PointLight(0xf59e0b, 0.8, 4.5); glow.position.y = 0.9;
+        group.add(base, lid, stripe, glow); group.position.set(x, 0, z);
+        const boxData = { group, collected: false, x, z, baseMat: boxMat };
+        group.traverse(obj => { if (obj.isMesh) obj.userData.ammoBox = boxData; });
+        return boxData;
+      }
+
+      function createZombieMesh(x, z, id) {
+        const group = new THREE.Group();
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0x6b8e6b, roughness: 0.8 });
+        const shirtMat = new THREE.MeshStandardMaterial({ color: 0x3b2f35, roughness: 0.9 });
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+
+        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.72, 0.22), pantsMat); legL.position.set(-0.14, 0.36, 0);
+        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.72, 0.22), pantsMat); legR.position.set(0.14, 0.36, 0);
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.72, 0.3), shirtMat); torso.position.set(0, 1.08, 0);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.38, 0.38), skinMat); head.position.set(0, 1.65, 0);
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.05), eyeMat); eyeL.position.set(-0.09, 1.68, 0.19);
+        const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.05), eyeMat); eyeR.position.set(0.09, 1.68, 0.19);
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.62, 0.18), skinMat); armL.position.set(-0.38, 1.24, 0.22); armL.rotation.x = -Math.PI / 2.4;
+        const armR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.62, 0.18), skinMat); armR.position.set(0.38, 1.24, 0.22); armR.rotation.x = -Math.PI / 2.4;
+        const hitBox = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.95, 0.75), new THREE.MeshBasicMaterial({ visible: false })); hitBox.position.set(0, 1.0, 0);
+
+        group.add(legL, legR, torso, head, eyeL, eyeR, armL, armR, hitBox); group.position.set(x, 0, z);
+        const zData = {
+          id, group, hitBox, parts: { legL, legR, armL, armR, head, torso }, materials: [skinMat, shirtMat, pantsMat],
+          hp: 2, state: 'wander', wanderDir: new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize(),
+          wanderTimer: 0.2, lastSeenPos: null, lostTimer: 0, hitFlash: 0, walkPhase: Math.random() * Math.PI * 2, radius: 0.55
+        };
+        hitBox.userData.zombie = zData;
+        group.traverse(obj => { if (obj.isMesh && obj !== hitBox) obj.userData.zombie = zData; });
+        return zData;
+      }
+
+      function pickOpenWanderDir(zombie) {
+        const dirs = [
+          new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1),
+          new THREE.Vector3(0.707,0,0.707), new THREE.Vector3(-0.707,0,0.707), new THREE.Vector3(0.707,0,-0.707), new THREE.Vector3(-0.707,0,-0.707)
+        ];
+        const openDirs = dirs.filter(d => {
+          const g = worldToGrid(zombie.group.position.x + d.x * 1.4, zombie.group.position.z + d.z * 1.4);
+          return !isWallCell(g.col, g.row);
+        });
+        if (openDirs.length > 0) zombie.wanderDir.copy(openDirs[Math.floor(Math.random() * openDirs.length)]);
+        else { const a = Math.random() * Math.PI * 2; zombie.wanderDir.set(Math.cos(a), 0, Math.sin(a)); }
+        zombie.wanderTimer = 2.0 + Math.random() * 2.5;
+      }
+
+      function buildLevelWorld(levelConfig) {
+        const theme = levelConfig.theme, map = levelConfig.map;
+        scene.background = new THREE.Color(theme.bg);
+        scene.fog = new THREE.FogExp2(theme.fogColor, theme.fogDensity);
+        ambientLight.color.setHex(theme.ambientColor); ambientLight.intensity = theme.ambientInt;
+
+        scene.remove(worldGroup); worldGroup = new THREE.Group(); scene.add(worldGroup);
+        wallMeshes = []; ammoBoxes = []; zombies = []; particles = []; propColliders = []; dynamicLights = [];
+
+        const totalW = MAP_COLS * CELL_SIZE, totalD = MAP_ROWS * CELL_SIZE;
+        const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(totalW, totalD), new THREE.MeshStandardMaterial({ map: makeThemedFloorTexture(theme), roughness: 0.85, metalness: 0.1 }));
+        floorMesh.rotation.x = -Math.PI / 2; worldGroup.add(floorMesh);
+
+        const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(totalW, totalD), new THREE.MeshStandardMaterial({ map: makeThemedCeilingTexture(theme), roughness: 0.9 }));
+        ceilMesh.rotation.x = Math.PI / 2; ceilMesh.position.y = WALL_HEIGHT; worldGroup.add(ceilMesh);
+
+        const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+        const wallMat = new THREE.MeshStandardMaterial({ map: makeThemedWallTexture(theme), roughness: 0.85 });
+
+        let zombieCounter = 0;
+        for (let r = 0; r < MAP_ROWS; r++) {
+          for (let c = 0; c < MAP_COLS; c++) {
+            const ch = map[r][c], { x, z } = gridToWorld(c, r);
+            if (ch === '#') {
+              const wall = new THREE.Mesh(wallGeo, wallMat); wall.position.set(x, WALL_HEIGHT / 2, z);
+              worldGroup.add(wall); wallMeshes.push(wall);
+            } else if (ch === 'S') {
+              player.pos.set(x, player.height, z); player.yaw = 0; player.pitch = 0;
+            } else if (ch === 'A') {
+              const box = createAmmoBoxMesh(x, z); worldGroup.add(box.group); ammoBoxes.push(box);
+            } else if (ch === 'Z') {
+              zombieCounter++;
+              const zom = createZombieMesh(x, z, zombieCounter); pickOpenWanderDir(zom);
+              worldGroup.add(zom.group); zombies.push(zom);
+            }
+          }
+        }
+
+        gameState.totalBoxes = ammoBoxes.length;
+        gameState.totalZombies = zombies.length;
+        buildLevelProps(levelConfig.id);
+
+        theme.lights.forEach((ls, idx) => {
+          const { x, z } = gridToWorld(ls.col, ls.row);
+          const pLight = new THREE.PointLight(ls.color, ls.int, 15, 1.5);
+          pLight.position.set(x, WALL_HEIGHT - 0.35, z); worldGroup.add(pLight);
+          const bulbMat = new THREE.MeshBasicMaterial({ color: ls.color });
+          const bulb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.5), bulbMat);
+          bulb.position.set(x, WALL_HEIGHT - 0.04, z); worldGroup.add(bulb);
+          if (ls.flicker || ls.pulse) {
+            dynamicLights.push({ light: pLight, bulbMat, baseInt: ls.int, baseColor: new THREE.Color(ls.color), mode: ls.pulse ? 'pulse' : 'flicker', phase: idx * 1.7 });
+          }
+        });
+      }
+
+      // ==========================================================
+      // 8. TUMBUKAN, LOS, & BFS PATHFINDING
+      // ==========================================================
+      function resolveCircleAABB(pos, radius, minX, maxX, minZ, maxZ) {
+        const closestX = Math.max(minX, Math.min(pos.x, maxX)), closestZ = Math.max(minZ, Math.min(pos.z, maxZ));
+        const dx = pos.x - closestX, dz = pos.z - closestZ, distSq = dx * dx + dz * dz;
+        if (distSq < radius * radius) {
+          const dist = Math.sqrt(distSq) || 0.0001, overlap = radius - dist;
+          pos.x += (dx / dist) * overlap; pos.z += (dz / dist) * overlap;
+        }
+      }
+
+      function resolveWallCollision(pos, radius) {
+        const { col, row } = worldToGrid(pos.x, pos.z);
+        for (let r = row - 1; r <= row + 1; r++) {
+          for (let c = col - 1; c <= col + 1; c++) {
+            if (!isWallCell(c, r)) continue;
+            const center = gridToWorld(c, r), half = CELL_SIZE / 2;
+            resolveCircleAABB(pos, radius, center.x - half, center.x + half, center.z - half, center.z + half);
+          }
+        }
+        for (let i = 0; i < propColliders.length; i++) {
+          const p = propColliders[i];
+          resolveCircleAABB(pos, radius, p.minX, p.maxX, p.minZ, p.maxZ);
+        }
+      }
+
+      function hasLineOfSight(x1, z1, x2, z2) {
+        const dx = x2 - x1, dz = z2 - z1, steps = Math.ceil(Math.hypot(dx, dz) / 0.45);
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps, g = worldToGrid(x1 + dx * t, z1 + dz * t);
+          if (isWallCell(g.col, g.row)) return false;
+        }
+        return true;
+      }
+
+      let flowGrid = null, flowUpdateTimer = 0;
+      function computeFlowFieldToPlayer() {
+        const pGrid = worldToGrid(player.pos.x, player.pos.z);
+        const dist = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(Infinity));
+        const nextStep = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(null));
+        if (isWallCell(pGrid.col, pGrid.row)) return nextStep;
+        const queue = [[pGrid.row, pGrid.col]]; dist[pGrid.row][pGrid.col] = 0;
+        const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+        let head = 0;
+        while (head < queue.length) {
+          const [r, c] = queue[head++];
+          for (const [dr, dc] of dirs) {
+            const nr = r + dr, nc = c + dc;
+            if (!isWallCell(nc, nr) && dist[nr][nc] === Infinity) {
+              dist[nr][nc] = dist[r][c] + 1; nextStep[nr][nc] = { row: r, col: c }; queue.push([nr, nc]);
+            }
+          }
+        }
+        return nextStep;
+      }
+
+      function spawnParticles(pos, color, count) {
+        const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08), mat = new THREE.MeshBasicMaterial({ color });
+        for (let i = 0; i < count; i++) {
+          const m = new THREE.Mesh(geo, mat); m.position.copy(pos); worldGroup.add(m);
+          particles.push({ mesh: m, vel: new THREE.Vector3((Math.random()-0.5)*4, Math.random()*3.5, (Math.random()-0.5)*4), life: 0.4 + Math.random()*0.25 });
+        }
+      }
+
+      // ==========================================================
+      // 10. KONTROL INPUT (PC & HP LANDSCAPE)
+      // ==========================================================
+      const keys = {};
+      let isPointerLocked = false, isMouseDragging = false, lastMouseX = 0, lastMouseY = 0;
+      let isTouchMode = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const joystick = { active: false, id: null, dx: 0, dy: 0 }, lookTouch = { active: false, id: null, lastX: 0, lastY: 0 };
+      const mobileControlsEl = document.getElementById('mobile-controls'), pcKeyHintEl = document.getElementById('pc-key-hint');
+
+      function updateTouchUI() {
+        if (isTouchMode && gameState.started && !gameState.questionOpen && !gameState.paused && !gameState.ended) {
+          mobileControlsEl.classList.add('active'); pcKeyHintEl.style.display = 'none';
+        } else {
+          mobileControlsEl.classList.remove('active'); pcKeyHintEl.style.display = isTouchMode ? 'none' : 'inline';
+        }
+      }
+
+      const btnToggleTouch = document.getElementById('btn-toggle-touch');
+      btnToggleTouch.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+      btnToggleTouch.addEventListener('click', (e) => { e.stopPropagation(); isTouchMode = !isTouchMode; updateTouchUI(); });
+
+      window.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if (gameState.questionOpen) {
+          if (e.code === 'Escape') { e.preventDefault(); closeQuestionModal(); }
+          else if (!gameState.questionLocked) {
+            if (e.code === 'Digit1' || e.code === 'KeyA') selectMultipleChoiceByIndex(0);
+            else if (e.code === 'Digit2' || e.code === 'KeyB') selectMultipleChoiceByIndex(1);
+            else if (e.code === 'Digit3' || e.code === 'KeyC') selectMultipleChoiceByIndex(2);
+            else if (e.code === 'Digit4' || e.code === 'KeyD') selectMultipleChoiceByIndex(3);
+          }
+          return;
+        }
+        if (!gameState.started || gameState.paused || gameState.ended) return;
+        if (e.code === 'Space') { e.preventDefault(); shootWeapon(); }
+        else if (e.code === 'KeyE' || e.code === 'KeyF') {
+          const boxToOpen = gameState.targetedBox || gameState.lastValidBox;
+          if (boxToOpen && !boxToOpen.collected) openQuestionModal(boxToOpen);
+        } else if (e.code === 'KeyP') pauseGame();
+      });
+      window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+      canvas.addEventListener('mousedown', (e) => {
+        if (!gameState.started || gameState.paused || gameState.questionOpen || gameState.ended || isTouchMode) return;
+        sound.init();
+        if (!isPointerLocked) {
+          if (canvas.requestPointerLock) { try { canvas.requestPointerLock(); } catch (_) {} }
+          isMouseDragging = true; lastMouseX = e.clientX; lastMouseY = e.clientY;
+        }
+        if (e.button === 0 && isPointerLocked) shootWeapon();
+      });
+      window.addEventListener('mouseup', () => { isMouseDragging = false; });
+      window.addEventListener('mousemove', (e) => {
+        if (!gameState.started || gameState.paused || gameState.questionOpen || gameState.ended) return;
+        if (isPointerLocked) {
+          player.yaw -= e.movementX * 0.0022; player.pitch -= e.movementY * 0.0022;
+          player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
+        } else if (isMouseDragging && !isTouchMode) {
+          const dx = e.clientX - lastMouseX, dy = e.clientY - lastMouseY;
+          lastMouseX = e.clientX; lastMouseY = e.clientY;
+          player.yaw -= dx * 0.0035; player.pitch -= dy * 0.0035;
+          player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
+        }
+      });
+      document.addEventListener('pointerlockchange', () => { isPointerLocked = document.pointerLockElement === canvas; });
+
+      const joyZone = document.getElementById('joystick-zone'), joyKnob = document.getElementById('joystick-knob');
+      function updateJoystick(clientX, clientY) {
+        const rect = joyZone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2, maxR = rect.width / 2 - 20;
+        let dx = clientX - cx, dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxR) { dx = (dx / dist) * maxR; dy = (dy / dist) * maxR; }
+        joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        joystick.dx = dx / maxR; joystick.dy = dy / maxR;
+      }
+      joyZone.addEventListener('touchstart', (e) => { e.preventDefault(); sound.init(); const t = e.changedTouches[0]; joystick.active = true; joystick.id = t.identifier; updateJoystick(t.clientX, t.clientY); }, { passive: false });
+      joyZone.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joystick.id) updateJoystick(t.clientX, t.clientY); }, { passive: false });
+      function resetJoystick(e) { for (const t of e.changedTouches) if (t.identifier === joystick.id) { joystick.active = false; joystick.id = null; joystick.dx = 0; joystick.dy = 0; joyKnob.style.transform = 'translate(-50%,-50%)'; } }
+      joyZone.addEventListener('touchend', resetJoystick); joyZone.addEventListener('touchcancel', resetJoystick);
+
+      const lookZone = document.getElementById('look-zone');
+      lookZone.addEventListener('touchstart', (e) => { e.preventDefault(); sound.init(); const t = e.changedTouches[0]; lookTouch.active = true; lookTouch.id = t.identifier; lookTouch.lastX = t.clientX; lookTouch.lastY = t.clientY; }, { passive: false });
+      lookZone.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!gameState.started || gameState.paused || gameState.questionOpen || gameState.ended) return;
+        for (const t of e.changedTouches) {
+          if (t.identifier === lookTouch.id) {
+            const dx = t.clientX - lookTouch.lastX, dy = t.clientY - lookTouch.lastY;
+            lookTouch.lastX = t.clientX; lookTouch.lastY = t.clientY;
+            player.yaw -= dx * 0.0045; player.pitch -= dy * 0.0045;
+            player.pitch = Math.max(-1.35, Math.min(1.35, player.pitch));
+          }
+        }
+      }, { passive: false });
+      function resetLookTouch(e) { for (const t of e.changedTouches) if (t.identifier === lookTouch.id) { lookTouch.active = false; lookTouch.id = null; } }
+      lookZone.addEventListener('touchend', resetLookTouch); lookZone.addEventListener('touchcancel', resetLookTouch);
+
+      document.getElementById('btn-shoot-mobile').addEventListener('touchstart', (e) => {
+        e.preventDefault(); e.stopPropagation(); sound.init();
+        if (gameState.started && !gameState.paused && !gameState.questionOpen && !gameState.ended) shootWeapon();
+      }, { passive: false });
+
+      // ==========================================================
+      // 11. MEKANIK MENEMBAK & KONFIRMASI JAWAB
+      // ==========================================================
+      const raycaster = new THREE.Raycaster(), centerNDC = new THREE.Vector2(0, 0);
+      const crosshairEl = document.getElementById('crosshair'), hitmarkerEl = document.getElementById('hitmarker');
+      const confirmLayerEl = document.getElementById('confirm-jawab-layer'), toastEl = document.getElementById('status-toast');
+      let toastTimeout = null;
+
+      function showToast(msg, duration = 2400) {
+        toastEl.textContent = msg; toastEl.classList.add('visible');
+        clearTimeout(toastTimeout); toastTimeout = setTimeout(() => toastEl.classList.remove('visible'), duration);
+      }
+
+      function shootWeapon() {
+        if (player.ammo <= 0) {
+          sound.playEmptyClick(); showToast('Peluru habis! Arahkan senjata ke kotak peluru untuk mengisi.'); return;
+        }
+        player.ammo--; gameState.shotsFired++; gameState.recoil = 1.0; gameState.muzzleTimer = 0.06;
+        muzzleFlash.visible = true; muzzleLight.intensity = 3.5; sound.playGunshot();
+
+        raycaster.setFromCamera(centerNDC, camera);
+        const targets = [...wallMeshes];
+        zombies.forEach(z => { if (z.state !== 'dead') targets.push(z.hitBox); });
+        const hits = raycaster.intersectObjects(targets, false);
+
+        if (hits.length > 0) {
+          const hit = hits[0], zom = hit.object.userData.zombie;
+          if (zom && zom.state !== 'dead') {
+            gameState.shotsHit++; zom.hp--; zom.hitFlash = 0.18;
+            const push = new THREE.Vector3().subVectors(zom.group.position, player.pos).setY(0).normalize().multiplyScalar(0.65);
+            zom.group.position.add(push); resolveWallCollision(zom.group.position, zom.radius);
+            hitmarkerEl.classList.add('active'); setTimeout(() => hitmarkerEl.classList.remove('active'), 120);
+            spawnParticles(hit.point, 0xef4444, 12);
+
+            if (zom.hp <= 0) {
+              zom.state = 'dead'; gameState.kills++; sound.playZombieHit(true);
+              showToast(`Zombie tumbang! (${gameState.kills}/${gameState.totalZombies})`);
+              if (gameState.kills >= gameState.totalZombies) setTimeout(() => endGame(true), 600);
+            } else {
+              sound.playZombieHit(false); zom.state = 'chase'; zom.lastSeenPos = player.pos.clone(); zom.lostTimer = 5;
+            }
+          } else spawnParticles(hit.point, 0xfbbf24, 6);
+        }
+        checkEmergencyAmmo(); updateHUD();
+      }
+
+      function checkEmergencyAmmo() {
+        const remainingBoxes = ammoBoxes.filter(b => !b.collected).length;
+        if (player.ammo === 0 && remainingBoxes === 0 && gameState.kills < gameState.totalZombies && !gameState.emergencySpawned) {
+          gameState.emergencySpawned = true;
+          const spawnCell = gridToWorld(2, 12), box = createAmmoBoxMesh(spawnCell.x, spawnCell.z);
+          worldGroup.add(box.group); ammoBoxes.push(box);
+          showToast('Peluru habis! Kotak peluru darurat muncul di area awal!', 3500);
+        }
+      }
+
+      function checkCrosshairTarget(dt) {
+        raycaster.setFromCamera(centerNDC, camera);
+        const boxTargets = [];
+        ammoBoxes.forEach(b => { if (!b.collected) b.group.traverse(obj => { if (obj.isMesh) boxTargets.push(obj); }); });
+        const wallHits = raycaster.intersectObjects(wallMeshes, false), wallDist = wallHits.length > 0 ? wallHits[0].distance : Infinity;
+        const boxHits = raycaster.intersectObjects(boxTargets, false);
+
+        let foundBox = null;
+        if (boxHits.length > 0 && boxHits[0].distance < 7.2 && boxHits[0].distance < wallDist) foundBox = boxHits[0].object.userData.ammoBox;
+        ammoBoxes.forEach(b => { b.baseMat.emissiveIntensity = (b === foundBox) ? 1.1 : 0.35; });
+
+        gameState.targetedBox = foundBox;
+        if (foundBox) { gameState.lastValidBox = foundBox; gameState.targetGraceTimer = 0.28; }
+        else if (gameState.targetGraceTimer > 0) {
+          gameState.targetGraceTimer -= dt;
+          if (gameState.targetGraceTimer <= 0) gameState.lastValidBox = null;
+        }
+
+        const activePromptBox = foundBox || gameState.lastValidBox;
+        if (activePromptBox && !activePromptBox.collected) { crosshairEl.classList.add('target-ammo'); confirmLayerEl.classList.add('visible'); }
+        else { crosshairEl.classList.remove('target-ammo'); confirmLayerEl.classList.remove('visible'); }
+
+        const zTargets = zombies.filter(z => z.state !== 'dead').map(z => z.hitBox);
+        const zHits = raycaster.intersectObjects(zTargets, false);
+        if (!foundBox && zHits.length > 0 && zHits[0].distance < wallDist) crosshairEl.classList.add('target-zombie');
+        else crosshairEl.classList.remove('target-zombie');
+      }
+
+      // ==========================================================
+      // 12. MODAL PERTANYAAN IMBUHAN ME- (4 PILIHAN GANDA)
+      // ==========================================================
+      const questionModal = document.getElementById('question-modal'), qLevelBadgeEl = document.getElementById('q-level-badge');
+      const qWordEl = document.getElementById('q-word'), mcOptionsEl = document.getElementById('mc-options');
+      const qFeedbackEl = document.getElementById('q-feedback'), btnJawabConfirm = document.getElementById('btn-jawab-confirm');
+      const btnQBack = document.getElementById('btn-q-back');
+      let lastJawabTap = 0;
+
+      function triggerJawabAction(e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        const now = Date.now();
+        if (now - lastJawabTap < 280) return;
+        lastJawabTap = now; sound.init();
+        const targetBox = gameState.targetedBox || gameState.lastValidBox;
+        if (targetBox && !targetBox.collected) openQuestionModal(targetBox);
+      }
+      btnJawabConfirm.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+      btnJawabConfirm.addEventListener('touchend', triggerJawabAction, { passive: false });
+      btnJawabConfirm.addEventListener('click', triggerJawabAction);
+
+      function renderMultipleChoiceButtons(question) {
+        const letters = ['A', 'B', 'C', 'D'];
+        mcOptionsEl.innerHTML = '';
+        question.options.forEach((optText, idx) => {
+          const btn = document.createElement('button');
+          btn.type = 'button'; btn.className = 'mc-btn';
+          btn.innerHTML = `<span class="mc-letter">${letters[idx]}</span><span>${optText}</span>`;
+          btn.addEventListener('click', (e) => { e.stopPropagation(); handleMultipleChoicePick(optText, btn); });
+          mcOptionsEl.appendChild(btn);
+        });
+      }
+
+      function lockAllChoiceButtons() { mcOptionsEl.querySelectorAll('.mc-btn').forEach(btn => { btn.disabled = true; }); }
+      function selectMultipleChoiceByIndex(idx) {
+        if (gameState.questionLocked) return;
+        const buttons = mcOptionsEl.querySelectorAll('.mc-btn');
+        if (buttons[idx] && !buttons[idx].disabled) buttons[idx].click();
+      }
+
+      function handleMultipleChoicePick(chosenText, btnEl) {
+        if (!gameState.questionOpen || !gameState.currentQuestion || gameState.ended || gameState.questionLocked) return;
+        sound.init(); gameState.questionLocked = true; lockAllChoiceButtons();
+
+        if (chosenText === gameState.currentQuestion.answer) {
+          btnEl.classList.add('correct'); sound.playSuccess();
+          qFeedbackEl.textContent = `Benar! "${gameState.currentQuestion.answer}" (+2 Peluru)`;
+          qFeedbackEl.className = 'success'; gameState.questionsAnswered++; player.ammo += 2;
+          if (gameState.activeBox && !gameState.activeBox.collected) {
+            gameState.activeBox.collected = true; worldGroup.remove(gameState.activeBox.group);
+          }
+          gameState.lastValidBox = null; gameState.targetedBox = null; updateHUD();
+          setTimeout(() => { if (!gameState.ended) { closeQuestionModal(); showToast('Berhasil! +2 Peluru ditambahkan.'); } }, 500);
+        } else {
+          btnEl.classList.add('wrong'); sound.playError();
+          qFeedbackEl.textContent = 'Jawaban salah! Tekan "Kembali", lalu pilih "Jawab" lagi untuk soal baru.';
+          qFeedbackEl.className = 'error'; btnQBack.classList.add('highlight');
+        }
+      }
+
+      function openQuestionModal(box) {
+        if (gameState.questionOpen || box.collected || gameState.ended) return;
+        gameState.questionOpen = true; gameState.questionLocked = false; gameState.activeBox = box;
+        gameState.currentQuestion = generateImbuhanQuestion(gameState.currentLevel);
+        joystick.active = false; joystick.dx = 0; joystick.dy = 0; joyKnob.style.transform = 'translate(-50%,-50%)';
+        Object.keys(keys).forEach(k => { keys[k] = false; });
+        if (document.pointerLockElement) document.exitPointerLock();
+        confirmLayerEl.classList.remove('visible'); updateTouchUI();
+
+        qLevelBadgeEl.textContent = `SOAL ${gameState.currentLevel.name.toUpperCase()}`;
+        qWordEl.textContent = gameState.currentQuestion.word;
+        qFeedbackEl.textContent = ''; qFeedbackEl.className = '';
+        btnQBack.classList.remove('highlight');
+        renderMultipleChoiceButtons(gameState.currentQuestion);
+        questionModal.classList.remove('hidden');
+      }
+
+      function closeQuestionModal() {
+        gameState.questionOpen = false; gameState.questionLocked = false; gameState.activeBox = null;
+        btnQBack.classList.remove('highlight'); questionModal.classList.add('hidden'); updateTouchUI();
+      }
+      btnQBack.addEventListener('click', closeQuestionModal);
+
+      const alarmBtn = document.getElementById('alarm-btn');
+      alarmBtn.addEventListener('click', (e) => { e.stopPropagation(); if (gameState.questionOpen) closeQuestionModal(); });
+      alarmBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); if (gameState.questionOpen) closeQuestionModal(); }, { passive: false });
+
+      // ==========================================================
+      // 13. AI ZOMBIE (> 4 MENIT AGRESIF + EXTRA AGRESIF DI LEVEL 11)
+      // ==========================================================
+      const dangerVignette = document.getElementById('danger-vignette');
+
+      function updateZombies(dt, nowMs) {
+        let alarmTriggered = false;
+        const isBossLvl = !!gameState.currentLevel.extraAggressive;
+        const progressRatio = Math.min(1, gameState.playTimeSec / 240);
+
+        if (gameState.playTimeSec > 240) {
+          if (!gameState.aggressiveMode) {
+            gameState.aggressiveMode = true; sound.playZombieAlert();
+            showToast('🔥 LEWAT 4 MENIT! SEMUA ZOMBIE MENJADI AGRESIF MENGEJAR!', 4200);
+          }
+          flowUpdateTimer -= dt;
+          if (flowUpdateTimer <= 0 || !flowGrid) { flowGrid = computeFlowFieldToPlayer(); flowUpdateTimer = 0.4; }
+        } else if (isBossLvl) {
+          flowUpdateTimer -= dt;
+          if (flowUpdateTimer <= 0 || !flowGrid) { flowGrid = computeFlowFieldToPlayer(); flowUpdateTimer = 0.5; }
+        }
+
+        const sightRange = isBossLvl ? 24 : 18;
+        const closeSense = isBossLvl ? 7.5 : 4.5;
+        const memoryTime = isBossLvl ? 6.0 : 3.5;
+
+        for (let i = 0; i < zombies.length; i++) {
+          const z = zombies[i];
+          if (z.state === 'dead') {
+            if (z.group.rotation.x > -Math.PI / 2) {
+              z.group.rotation.x = Math.max(-Math.PI / 2, z.group.rotation.x - dt * 4.5);
+              z.group.position.y = Math.max(-0.2, z.group.position.y - dt * 0.5);
+            }
+            continue;
+          }
+          if (z.hitFlash > 0) {
+            z.hitFlash -= dt;
+            z.materials.forEach(m => m.emissive.setHex(z.hitFlash > 0 ? 0x991b1b : 0x000000));
+          }
+
+          const toPlayer = new THREE.Vector3().subVectors(player.pos, z.group.position); toPlayer.y = 0;
+          const distToPlayer = toPlayer.length();
+          const hasLOS = hasLineOfSight(z.group.position.x, z.group.position.z, player.pos.x, player.pos.z);
+
+          let seesPlayer = false;
+          if (gameState.aggressiveMode) seesPlayer = true;
+          else if (distToPlayer < sightRange && hasLOS) {
+            if (distToPlayer < closeSense) seesPlayer = true;
+            else {
+              const forward = new THREE.Vector3(Math.sin(z.group.rotation.y), 0, Math.cos(z.group.rotation.y));
+              if (forward.dot(toPlayer.clone().normalize()) > (isBossLvl ? -0.4 : -0.15)) seesPlayer = true;
+            }
+          }
+
+          if (seesPlayer) {
+            if (z.state !== 'chase') sound.playZombieAlert();
+            z.state = 'chase'; z.lastSeenPos = player.pos.clone(); z.lostTimer = memoryTime;
+          } else if (z.state === 'chase') {
+            z.lostTimer -= dt;
+            if (z.lostTimer <= 0) { z.state = 'wander'; pickOpenWanderDir(z); }
+          }
+
+          if (distToPlayer < 10.5 || (z.state === 'chase' && hasLOS)) alarmTriggered = true;
+
+          let moveDir = new THREE.Vector3();
+          let moveSpeed = (isBossLvl ? 1.25 : 0.85) + progressRatio * 0.35;
+
+          if (z.state === 'chase') {
+            moveSpeed = gameState.aggressiveMode
+              ? (isBossLvl ? 3.25 : 2.8)
+              : ((isBossLvl ? 2.35 : 1.85) + progressRatio * 0.35);
+
+            if (hasLOS) moveDir.subVectors(player.pos, z.group.position).setY(0);
+            else if ((gameState.aggressiveMode || isBossLvl) && flowGrid) {
+              const zg = worldToGrid(z.group.position.x, z.group.position.z);
+              const nextCell = flowGrid[zg.row]?.[zg.col];
+              if (nextCell) {
+                const targetPos = gridToWorld(nextCell.col, nextCell.row);
+                moveDir.set(targetPos.x - z.group.position.x, 0, targetPos.z - z.group.position.z);
+              } else moveDir.subVectors(player.pos, z.group.position).setY(0);
+            } else {
+              moveDir.subVectors(z.lastSeenPos || player.pos, z.group.position).setY(0);
+            }
+            if (moveDir.lengthSq() > 0.001) moveDir.normalize();
+          } else {
+            z.wanderTimer -= dt;
+            if (z.wanderTimer <= 0) pickOpenWanderDir(z);
+            moveDir.copy(z.wanderDir);
+          }
+
+          const prevX = z.group.position.x, prevZ = z.group.position.z;
+          z.group.position.x += moveDir.x * moveSpeed * dt;
+          z.group.position.z += moveDir.z * moveSpeed * dt;
+          resolveWallCollision(z.group.position, z.radius);
+
+          for (let j = i + 1; j < zombies.length; j++) {
+            const other = zombies[j]; if (other.state === 'dead') continue;
+            const sep = new THREE.Vector3().subVectors(z.group.position, other.group.position).setY(0);
+            const d = sep.length();
+            if (d > 0 && d < 1.1) { sep.normalize().multiplyScalar((1.1 - d) * 0.5); z.group.position.add(sep); other.group.position.sub(sep); }
+          }
+
+          if (z.state === 'wander' && Math.hypot(z.group.position.x - prevX, z.group.position.z - prevZ) < moveSpeed * dt * 0.35) pickOpenWanderDir(z);
+          if (moveDir.lengthSq() > 0.001) z.group.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+
+          z.walkPhase += dt * (z.state === 'chase' ? (gameState.aggressiveMode || isBossLvl ? 7.5 : 5.5) : 3.0);
+          z.parts.legL.rotation.x = Math.sin(z.walkPhase) * 0.45; z.parts.legR.rotation.x = -Math.sin(z.walkPhase) * 0.45;
+          z.parts.armL.rotation.x = -Math.PI / 2.4 + Math.sin(z.walkPhase * 0.5) * 0.12;
+          z.parts.armR.rotation.x = -Math.PI / 2.4 - Math.sin(z.walkPhase * 0.5) * 0.12;
+
+          if (distToPlayer < 1.15) { endGame(false); return; }
+        }
+
+        dangerVignette.classList.toggle('alarm', alarmTriggered);
+        alarmBtn.classList.toggle('visible', alarmTriggered);
+        if (alarmTriggered) sound.playAlarmBeep(nowMs);
+      }
+
+      function updateDynamicLights(nowMs) {
+        for (let i = 0; i < dynamicLights.length; i++) {
+          const dl = dynamicLights[i];
+          if (dl.mode === 'pulse') {
+            const p = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(nowMs * 0.006 + dl.phase));
+            dl.light.intensity = dl.baseInt * p; dl.bulbMat.color.copy(dl.baseColor).multiplyScalar(p);
+          } else {
+            const wave = Math.sin(nowMs * 0.021 + dl.phase) * Math.sin(nowMs * 0.053 + dl.phase * 2);
+            const on = wave > -0.38 ? 1.0 : 0.12;
+            dl.light.intensity = dl.baseInt * on; dl.bulbMat.color.copy(dl.baseColor).multiplyScalar(on);
+          }
+        }
+      }
+
+      // ==========================================================
+      // 14. HUD & RADAR MINIMAP
+      // ==========================================================
+      const hudAmmo = document.getElementById('hud-ammo'), hudZombies = document.getElementById('hud-zombies');
+      const hudBoxes = document.getElementById('hud-boxes'), hudTimer = document.getElementById('hud-timer');
+      const hudRoom = document.getElementById('hud-room'), minimapCanvas = document.getElementById('minimap');
+      const mCtx = minimapCanvas.getContext('2d');
+
+      function formatTimeMMSS(totalSeconds) {
+        const secs = Math.floor(totalSeconds);
+        return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+      }
+
+      function updateHUD() {
+        hudAmmo.textContent = player.ammo;
+        hudZombies.textContent = `${gameState.totalZombies - gameState.kills}/${gameState.totalZombies}`;
+        hudBoxes.textContent = ammoBoxes.filter(b => !b.collected).length;
+        hudTimer.textContent = formatTimeMMSS(gameState.playTimeSec);
+        hudTimer.classList.toggle('aggressive', gameState.aggressiveMode);
+        const g = worldToGrid(player.pos.x, player.pos.z);
+        const modeTag = gameState.aggressiveMode ? ' • AGRESIF!' : (gameState.currentLevel.extraAggressive ? ' • ZOMBIE GANAS!' : '');
+        hudRoom.textContent = `${gameState.currentLevel.name} (${gameState.currentLevel.locationName}) • ${gameState.currentLevel.getRoomName(g.col, g.row)}${modeTag}`;
+      }
+
+      function drawMinimap(now) {
+        const map = gameState.currentLevel.map, w = minimapCanvas.width, h = minimapCanvas.height;
+        mCtx.clearRect(0, 0, w, h);
+        const cw = w / MAP_COLS, ch = h / MAP_ROWS;
+        for (let r = 0; r < MAP_ROWS; r++) for (let c = 0; c < MAP_COLS; c++) {
+          mCtx.fillStyle = map[r][c] === '#' ? '#334155' : '#0f172a';
+          mCtx.fillRect(c * cw, r * ch, cw + 0.5, ch + 0.5);
+        }
+        ammoBoxes.forEach(b => {
+          if (b.collected) return;
+          mCtx.fillStyle = '#f59e0b';
+          mCtx.fillRect((b.x / CELL_SIZE + MAP_COLS / 2) * cw - 2.8, (b.z / CELL_SIZE + MAP_ROWS / 2) * ch - 2.8, 5.6, 5.6);
+        });
+        zombies.forEach(z => {
+          if (z.state === 'dead') return;
+          const zx = (z.group.position.x / CELL_SIZE + MAP_COLS / 2) * cw, zz = (z.group.position.z / CELL_SIZE + MAP_ROWS / 2) * ch;
+          if (z.state === 'chase') {
+            mCtx.strokeStyle = 'rgba(239,68,68,0.75)'; mCtx.lineWidth = 1.5;
+            mCtx.beginPath(); mCtx.arc(zx, zz, 5 + Math.sin(now * 0.012) * 2, 0, Math.PI * 2); mCtx.stroke();
+          }
+          mCtx.fillStyle = z.state === 'chase' ? '#ff2a2a' : '#ef4444';
+          mCtx.beginPath(); mCtx.arc(zx, zz, 3.2, 0, Math.PI * 2); mCtx.fill();
+          mCtx.strokeStyle = '#fff'; mCtx.lineWidth = 0.8; mCtx.stroke();
+        });
+        const px = (player.pos.x / CELL_SIZE + MAP_COLS / 2) * cw, pz = (player.pos.z / CELL_SIZE + MAP_ROWS / 2) * ch;
+        mCtx.save(); mCtx.translate(px, pz); mCtx.rotate(-player.yaw);
+        mCtx.fillStyle = '#38bdf8'; mCtx.beginPath(); mCtx.moveTo(0, -5.5); mCtx.lineTo(4.5, 4.5); mCtx.lineTo(-4.5, 4.5); mCtx.closePath(); mCtx.fill(); mCtx.restore();
+      }
+
+      // ==========================================================
+      // 15. NAVIGASI LAYAR & LOOP UTAMA
+      // ==========================================================
+      const homeScreen = document.getElementById('home-screen'), levelScreen = document.getElementById('level-screen');
+      const missionScreen = document.getElementById('mission-screen'), howtoScreen = document.getElementById('howto-screen');
+      const aboutScreen = document.getElementById('about-screen'), pauseScreen = document.getElementById('pause-screen');
+      const endScreen = document.getElementById('end-screen'), hudEl = document.getElementById('hud');
+
+      function hideAllScreens() {
+        [homeScreen, levelScreen, missionScreen, howtoScreen, aboutScreen, pauseScreen, endScreen, questionModal].forEach(el => el.classList.add('hidden'));
+      }
+      function resetOverlayState() {
+        gameState.started = false; gameState.paused = false; gameState.questionOpen = false; gameState.ended = false;
+        if (document.pointerLockElement) document.exitPointerLock();
+        hideAllScreens(); hudEl.style.display = 'none'; mobileControlsEl.classList.remove('active');
+        dangerVignette.classList.remove('alarm'); alarmBtn.classList.remove('visible'); confirmLayerEl.classList.remove('visible');
+      }
+      function showHomeScreen() { resetOverlayState(); homeScreen.classList.remove('hidden'); }
+      function showLevelScreen() { resetOverlayState(); levelScreen.classList.remove('hidden'); }
+
+      function openMissionForLevel(levelConfig) {
+        gameState.currentLevel = levelConfig; hideAllScreens();
+        document.getElementById('mission-badge').textContent = `MISI — ${levelConfig.name.toUpperCase()}`;
+        document.getElementById('mission-title').textContent = levelConfig.subtitle;
+        document.getElementById('mission-location').textContent = `Lokasi: ${levelConfig.locationName}`;
+        document.getElementById('mission-story').innerHTML = `${levelConfig.missionDesc}<br><br>
+          Untuk selamat, tembak seluruh zombie (<strong>10 zombie</strong>). Ingat makin lama zombie akan makin agresif
+          (lewat <strong>4 menit</strong> mereka akan mengejar secara agresif${levelConfig.extraAggressive ? ', dan pada level ini zombie sudah lebih agresif sejak awal!' : ''}), jadi kamu harus segera menembak mereka.
+          Sebelum bisa menembak, cari dulu pelurunya (<strong>12 kotak peluru</strong>) dengan cara mengarahkan pistolmu ke kotak peluru lalu pilih <strong>“Jawab”</strong>.`;
+        document.getElementById('mission-formula').innerHTML = levelConfig.formulaHtml;
+        missionScreen.classList.remove('hidden');
+      }
+
+      const levelGridEl = document.getElementById('level-grid');
+      LEVELS.forEach(lvl => {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'level-card-btn' + (lvl.extraAggressive ? ' boss-card' : '');
+        btn.innerHTML = `<div class="level-card-title">${lvl.name}${lvl.extraAggressive ? ' 🔥' : ''}</div><div class="level-card-loc">📍 ${lvl.locationName}</div><div class="level-card-desc">${lvl.subtitle}</div>`;
+        btn.addEventListener('click', () => openMissionForLevel(lvl));
+        levelGridEl.appendChild(btn);
+      });
+
+      document.getElementById('btn-menu-levels').addEventListener('click', showLevelScreen);
+      document.getElementById('btn-menu-howto').addEventListener('click', () => { hideAllScreens(); howtoScreen.classList.remove('hidden'); });
+      document.getElementById('btn-menu-about').addEventListener('click', () => { hideAllScreens(); aboutScreen.classList.remove('hidden'); });
+      document.getElementById('btn-levels-back').addEventListener('click', showHomeScreen);
+      document.getElementById('btn-howto-back').addEventListener('click', showHomeScreen);
+      document.getElementById('btn-about-back').addEventListener('click', showHomeScreen);
+      document.getElementById('btn-mission-back').addEventListener('click', showLevelScreen);
+      document.getElementById('btn-mission-start').addEventListener('click', startNewGame);
+
+      function startNewGame() {
+        sound.init(); USED_WORDS.clear(); lastQuestionWord = ''; flowGrid = null; flowUpdateTimer = 0;
+        buildLevelWorld(gameState.currentLevel);
+        player.ammo = 0; player.bobTime = 0;
+        gameState.started = true; gameState.paused = false; gameState.questionOpen = false; gameState.questionLocked = false; gameState.ended = false;
+        gameState.kills = 0; gameState.shotsFired = 0; gameState.shotsHit = 0; gameState.questionsAnswered = 0;
+        gameState.playTimeSec = 0; gameState.aggressiveMode = false; gameState.emergencySpawned = false;
+        gameState.targetedBox = null; gameState.lastValidBox = null; gameState.targetGraceTimer = 0;
+
+        hideAllScreens(); hudEl.style.display = 'block';
+        dangerVignette.classList.remove('alarm'); alarmBtn.classList.remove('visible');
+        updateTouchUI(); updateHUD(); drawMinimap(performance.now());
+        showToast(`${gameState.currentLevel.name} • ${gameState.currentLevel.locationName}`, 3200);
+      }
+
+      function pauseGame() {
+        if (!gameState.started || gameState.ended || gameState.questionOpen) return;
+        gameState.paused = true; if (document.pointerLockElement) document.exitPointerLock();
+        pauseScreen.classList.remove('hidden'); updateTouchUI();
+      }
+      function resumeGame() { gameState.paused = false; pauseScreen.classList.add('hidden'); updateTouchUI(); }
+
+      function endGame(won) {
+        gameState.ended = true; gameState.started = false; gameState.questionOpen = false; gameState.questionLocked = false;
+        if (document.pointerLockElement) document.exitPointerLock();
+        btnQBack.classList.remove('highlight'); questionModal.classList.add('hidden'); confirmLayerEl.classList.remove('visible');
+        dangerVignette.classList.remove('alarm'); alarmBtn.classList.remove('visible'); updateTouchUI();
+
+        const totalSec = gameState.playTimeSec, mins = Math.floor(totalSec / 60), remS = (totalSec % 60).toFixed(1);
+        const acc = gameState.shotsFired > 0 ? Math.round((gameState.shotsHit / gameState.shotsFired) * 100) : 0;
+        const endTitle = document.getElementById('end-title'), endDesc = document.getElementById('end-desc'), endStats = document.getElementById('end-stats');
+
+        if (won) {
+          sound.playSuccess(); endTitle.textContent = 'SELAMAT! KAMU BERTAHAN HIDUP!'; endTitle.style.color = '#22c55e';
+          endDesc.textContent = `Semua 10 zombie di ${gameState.currentLevel.locationName} (${gameState.currentLevel.name}) berhasil dikalahkan!`;
+        } else {
+          sound.playError(); endTitle.textContent = 'KAMU TERTANGKAP ZOMBIE!'; endTitle.style.color = '#ef4444';
+          endDesc.textContent = `Zombie di ${gameState.currentLevel.locationName} berhasil menangkapmu. Tetap waspada dan coba lagi!`;
+        }
+        endStats.innerHTML = `
+          <div>Level &amp; Lokasi: <strong>${gameState.currentLevel.name} — ${gameState.currentLevel.locationName}</strong></div>
+          <div>Materi: <strong>${gameState.currentLevel.subtitle}</strong></div>
+          <div>Waktu Dihabiskan: <strong style="color:#34d399; font-size:16px;">${mins} menit ${remS} detik (${formatTimeMMSS(totalSec)})</strong></div>
+          <div>Zombie Dikalahkan: <strong>${gameState.kills} / ${gameState.totalZombies}</strong></div>
+          <div>Soal Terjawab Benar: <strong>${gameState.questionsAnswered}</strong></div>
+          <div>Akurasi Tembakan: <strong>${acc}%</strong> (${gameState.shotsHit}/${gameState.shotsFired})</div>
+        `;
+        endScreen.classList.remove('hidden');
+      }
+
+      document.getElementById('btn-resume').addEventListener('click', resumeGame);
+      document.getElementById('btn-pause-retry').addEventListener('click', startNewGame);
+      document.getElementById('btn-pause-levels').addEventListener('click', showLevelScreen);
+      document.getElementById('btn-pause-home').addEventListener('click', showHomeScreen);
+      document.getElementById('btn-end-retry').addEventListener('click', startNewGame);
+      document.getElementById('btn-end-levels').addEventListener('click', showLevelScreen);
+      document.getElementById('btn-end-home').addEventListener('click', showHomeScreen);
+
+      const btnPause = document.getElementById('btn-pause');
+      btnPause.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+      btnPause.addEventListener('click', (e) => { e.stopPropagation(); pauseGame(); });
+
+      const btnFullscreen = document.getElementById('btn-fullscreen');
+      btnFullscreen.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+      btnFullscreen.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+        else document.exitFullscreen?.().catch(() => {});
+      });
+
+      const rotateWarn = document.getElementById('rotate-warning'); let rotateDismissed = false;
+      function checkOrientation() {
+        const isPortrait = window.innerHeight > window.innerWidth;
+        rotateWarn.classList.toggle('visible', isTouchMode && isPortrait && !rotateDismissed);
+      }
+      document.getElementById('btn-dismiss-rotate').addEventListener('click', () => { rotateDismissed = true; rotateWarn.classList.remove('visible'); });
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight); checkOrientation();
+      });
+      checkOrientation();
+
+      let lastTime = performance.now();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, (now - lastTime) / 1000);
+        lastTime = now;
+
+        updateDynamicLights(now);
+
+        if (gameState.started && !gameState.paused && !gameState.ended) {
+          gameState.playTimeSec += dt;
+
+          if (!gameState.questionOpen) {
+            let forwardInput = 0, strafeInput = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) forwardInput += 1;
+            if (keys['KeyS'] || keys['ArrowDown']) forwardInput -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) strafeInput += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) strafeInput -= 1;
+            if (joystick.active) { strafeInput += joystick.dx; forwardInput -= joystick.dy; }
+
+            const moveVec = new THREE.Vector3();
+            moveVec.addScaledVector(new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)), forwardInput);
+            moveVec.addScaledVector(new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw)), strafeInput);
+
+            const isMoving = moveVec.lengthSq() > 0.01;
+            if (isMoving) {
+              if (moveVec.length() > 1) moveVec.normalize();
+              const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? player.sprintSpeed : player.speed;
+              player.pos.x += moveVec.x * spd * dt; player.pos.z += moveVec.z * spd * dt;
+              resolveWallCollision(player.pos, player.radius);
+              player.bobTime += dt * 10;
+            }
+
+            camera.position.copy(player.pos);
+            if (isMoving) camera.position.y += Math.sin(player.bobTime) * 0.04;
+            camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+
+            if (gameState.recoil > 0) gameState.recoil = Math.max(0, gameState.recoil - dt * 8);
+            if (gameState.muzzleTimer > 0) {
+              gameState.muzzleTimer -= dt;
+              if (gameState.muzzleTimer <= 0) { muzzleFlash.visible = false; muzzleLight.intensity = 0; }
+            }
+
+            weaponGroup.position.set(
+              0.24 + (isMoving ? Math.cos(player.bobTime * 0.5) * 0.01 : 0),
+              -0.22 + (isMoving ? Math.abs(Math.sin(player.bobTime * 0.5)) * 0.01 : 0),
+              -0.42 + gameState.recoil * 0.06
+            );
+            weaponGroup.rotation.x = gameState.recoil * 0.22;
+            checkCrosshairTarget(dt);
+          }
+
+          ammoBoxes.forEach((b, idx) => {
+            if (!b.collected) b.group.position.y = Math.sin(now * 0.003 + idx) * 0.05;
+          });
+
+          updateZombies(dt, now);
+          updateHUD();
+          drawMinimap(now);
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i]; p.life -= dt; p.vel.y -= 9.8 * dt;
+          p.mesh.position.addScaledVector(p.vel, dt);
+          if (p.life <= 0) { worldGroup.remove(p.mesh); particles.splice(i, 1); }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      buildLevelWorld(LEVELS[0]);
+      camera.position.copy(player.pos);
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>
+```
