@@ -618,7 +618,7 @@
       <h2 style="margin:0 0 14px; color:#38bdf8;">TENTANG</h2>
       <div class="info-box" style="text-align:left; font-size:14px;">
         <p style="margin-top:0;">
-          Game ini dibuat oleh <strong>Muhamad Patoni</strong>. Game ini ditujukan agar siswa mahir membuat kata turunan dari imbuhan <strong>Me-</strong> secara benar dengan cara yang menyenangkan.
+          Game Peluru Kata versi 1.1 ini dibuat oleh <strong>Muhamad Patoni</strong>. Game ini ditujukan agar siswa mahir membuat kata turunan dari imbuhan <strong>Me-</strong> secara benar dengan cara yang menyenangkan.
         </p>
         <p>
           Dalam game ini, kata dasar yang digunakan memang berupa kata-kata yang tidak lumrah digunakan atau bahkan tidak ada dalam bahasa Indonesia. Tujuannya agar siswa tidak menjawab hanya berdasarkan hafalan, tetapi karena benar-benar memahami rumus perubahannya.
@@ -1771,8 +1771,13 @@
       // ==========================================================
       const canvas = document.getElementById('game-canvas');
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      // HP: batasi resolusi render agar jumlah piksel yang diproses GPU jauh lebih ringan.
+      function applyRenderQuality() {
+        const touchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, touchDevice ? 1.25 : 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+      applyRenderQuality();
 
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x070a10);
@@ -2322,7 +2327,14 @@
 
           const toPlayer = new THREE.Vector3().subVectors(player.pos, z.group.position); toPlayer.y = 0;
           const distToPlayer = toPlayer.length();
-          const hasLOS = hasLineOfSight(z.group.position.x, z.group.position.z, player.pos.x, player.pos.z);
+          // Pemeriksaan garis pandang cukup diperbarui berkala; posisi dan gerak zombie tetap
+          // diperbarui setiap frame agar respons permainan tetap terasa langsung.
+          z._losCheckTimer = (z._losCheckTimer || 0) - dt;
+          if (z._losCheckTimer <= 0) {
+            z._cachedHasLOS = hasLineOfSight(z.group.position.x, z.group.position.z, player.pos.x, player.pos.z);
+            z._losCheckTimer = 0.12;
+          }
+          const hasLOS = !!z._cachedHasLOS;
 
           let seesPlayer = false;
           if (gameState.aggressiveMode) seesPlayer = true;
@@ -2514,7 +2526,13 @@
       document.getElementById('btn-howto-back').addEventListener('click', showHomeScreen);
       document.getElementById('btn-about-back').addEventListener('click', showHomeScreen);
       document.getElementById('btn-mission-back').addEventListener('click', showLevelScreen);
-      document.getElementById('btn-mission-start').addEventListener('click', startNewGame);
+      document.getElementById('btn-mission-start').addEventListener('click', () => {
+        // Minta mode layar penuh langsung dari interaksi pengguna.
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+        startNewGame();
+      });
 
       function startNewGame() {
         sound.init(); USED_WORDS.clear(); lastQuestionWord = ''; flowGrid = null; flowUpdateTimer = 0;
@@ -2594,17 +2612,26 @@
       document.getElementById('btn-dismiss-rotate').addEventListener('click', () => { rotateDismissed = true; rotateWarn.classList.remove('visible'); });
       window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight); checkOrientation();
+        applyRenderQuality(); checkOrientation();
       });
       checkOrientation();
 
       let lastTime = performance.now();
+      let lastLightUpdate = 0, lastHudUpdate = 0, lastMinimapUpdate = 0;
+      // Vektor gerak pemain dipakai ulang agar tidak membuat objek baru setiap frame.
+      const playerMoveVec = new THREE.Vector3();
+      const playerForwardVec = new THREE.Vector3();
+      const playerStrafeVec = new THREE.Vector3();
       function animate(now) {
         requestAnimationFrame(animate);
         const dt = Math.min(0.05, (now - lastTime) / 1000);
         lastTime = now;
 
-        updateDynamicLights(now);
+        // Efek lampu tidak perlu dihitung 60 kali per detik.
+        if (now - lastLightUpdate >= 50) {
+          updateDynamicLights(now);
+          lastLightUpdate = now;
+        }
 
         if (gameState.started && !gameState.paused && !gameState.ended) {
           gameState.playTimeSec += dt;
@@ -2617,13 +2644,15 @@
             if (keys['KeyA'] || keys['ArrowLeft']) strafeInput -= 1;
             if (joystick.active) { strafeInput += joystick.dx; forwardInput -= joystick.dy; }
 
-            const moveVec = new THREE.Vector3();
-            moveVec.addScaledVector(new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)), forwardInput);
-            moveVec.addScaledVector(new THREE.Vector3(Math.cos(player.yaw), 0, -Math.sin(player.yaw)), strafeInput);
+            const moveVec = playerMoveVec.set(0, 0, 0);
+            playerForwardVec.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+            playerStrafeVec.set(Math.cos(player.yaw), 0, -Math.sin(player.yaw));
+            moveVec.addScaledVector(playerForwardVec, forwardInput);
+            moveVec.addScaledVector(playerStrafeVec, strafeInput);
 
             const isMoving = moveVec.lengthSq() > 0.01;
             if (isMoving) {
-              if (moveVec.length() > 1) moveVec.normalize();
+              if (moveVec.lengthSq() > 1) moveVec.normalize();
               const spd = (keys['ShiftLeft'] || keys['ShiftRight']) ? player.sprintSpeed : player.speed;
               player.pos.x += moveVec.x * spd * dt; player.pos.z += moveVec.z * spd * dt;
               resolveWallCollision(player.pos, player.radius);
@@ -2654,8 +2683,15 @@
           });
 
           updateZombies(dt, now);
-          updateHUD();
-          drawMinimap(now);
+          // HUD cukup diperbarui 4 kali/detik; minimap 6-7 kali/detik.
+          if (now - lastHudUpdate >= 250) {
+            updateHUD();
+            lastHudUpdate = now;
+          }
+          if (now - lastMinimapUpdate >= 150) {
+            drawMinimap(now);
+            lastMinimapUpdate = now;
+          }
         }
 
         for (let i = particles.length - 1; i >= 0; i--) {
