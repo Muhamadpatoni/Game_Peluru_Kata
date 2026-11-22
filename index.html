@@ -596,11 +596,11 @@
         </ul>
       </div>
       <div class="info-box">
-        <strong>2. Bertahan Hidup &amp; Batas Waktu 4 Menit:</strong>
+        <strong>2. Bertahan Hidup &amp; Batas Waktu 5 Menit:</strong>
         <ul>
           <li>Permainan <strong>tetap berjalan</strong> saat kamu memilih jawaban. Jika zombie mendekat, <strong>alarm merah akan berkedip</strong>.</li>
           <li>Setiap zombie membutuhkan <strong>2 tembakan</strong> untuk tumbang.</li>
-          <li>Selesaikan secepatnya! Makin lama zombie makin agresif, dan setelah waktu <strong>lebih dari 4 menit</strong> semua zombie akan mengejarmu secara agresif (khusus Level 11, zombie sudah lebih agresif sejak awal!).</li>
+          <li>Selesaikan secepatnya! Makin lama zombie makin agresif, dan setelah waktu <strong>lebih dari 5 menit</strong> semua zombie akan mengejarmu secara agresif (khusus Level 11, zombie sudah lebih agresif sejak awal!).</li>
         </ul>
       </div>
       <div class="info-box">
@@ -2286,19 +2286,19 @@
       alarmBtn.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); if (gameState.questionOpen) closeQuestionModal(); }, { passive: false });
 
       // ==========================================================
-      // 13. AI ZOMBIE (> 4 MENIT AGRESIF + EXTRA AGRESIF DI LEVEL 11)
+      // 13. AI ZOMBIE (> 5 MENIT AGRESIF + EXTRA AGRESIF DI LEVEL 11)
       // ==========================================================
       const dangerVignette = document.getElementById('danger-vignette');
 
       function updateZombies(dt, nowMs) {
         let alarmTriggered = false;
         const isBossLvl = !!gameState.currentLevel.extraAggressive;
-        const progressRatio = Math.min(1, gameState.playTimeSec / 240);
+        const progressRatio = Math.min(1, gameState.playTimeSec / 300);
 
-        if (gameState.playTimeSec > 240) {
+        if (gameState.playTimeSec > 300) {
           if (!gameState.aggressiveMode) {
             gameState.aggressiveMode = true; sound.playZombieAlert();
-            showToast('🔥 LEWAT 4 MENIT! SEMUA ZOMBIE MENJADI AGRESIF MENGEJAR!', 4200);
+            showToast('🔥 LEWAT 5 MENIT! SEMUA ZOMBIE MENJADI AGRESIF MENGEJAR!', 4200);
           }
           flowUpdateTimer -= dt;
           if (flowUpdateTimer <= 0 || !flowGrid) { flowGrid = computeFlowFieldToPlayer(); flowUpdateTimer = 0.4; }
@@ -2504,7 +2504,7 @@
         document.getElementById('mission-location').textContent = `Lokasi: ${levelConfig.locationName}`;
         document.getElementById('mission-story').innerHTML = `${levelConfig.missionDesc}<br><br>
           Untuk selamat, tembak seluruh zombie (<strong>10 zombie</strong>). Ingat makin lama zombie akan makin agresif
-          (lewat <strong>4 menit</strong> mereka akan mengejar secara agresif${levelConfig.extraAggressive ? ', dan pada level ini zombie sudah lebih agresif sejak awal!' : ''}), jadi kamu harus segera menembak mereka.
+          (lewat <strong>5 menit</strong> mereka akan mengejar secara agresif${levelConfig.extraAggressive ? ', dan pada level ini zombie sudah lebih agresif sejak awal!' : ''}), jadi kamu harus segera menembak mereka.
           Sebelum bisa menembak, cari dulu pelurunya (<strong>12 kotak peluru</strong>) dengan cara mengarahkan pistolmu ke kotak peluru lalu pilih <strong>“Jawab”</strong>.`;
         document.getElementById('mission-formula').innerHTML = levelConfig.formulaHtml;
         missionScreen.classList.remove('hidden');
