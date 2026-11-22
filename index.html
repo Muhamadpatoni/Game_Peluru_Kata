@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -1130,6 +1129,72 @@
       ];
 
       // ==========================================================
+      // PENYUSUNAN ULANG LEVEL SESUAI TAHAP PERUBAHAN
+      // ==========================================================
+      const originalLevels = LEVELS.slice();
+      const cruiseLevel = {
+        ...originalLevels[10],
+        id: 3,
+        name: 'Level 3',
+        locationName: 'Kapal Pesiar Terbengkalai',
+        subtitle: 'Gabungan Materi Level 1 dan 2 (D, C, G, H)',
+        letters: [...new Set([...originalLevels[0].letters, ...originalLevels[1].letters])],
+        extraAggressive: false,
+        missionDesc: 'Kapal pesiar mewah berukuran besar ini terombang-ambing di tengah laut setelah wabah zombie. Lobi, koridor kabin, restoran, dapur utama, ruang hiburan, kasino, kolam renang indoor, ruang mesin, dan ruang kendali kini rusak, berantakan, lembap, serta menyeramkan.',
+        formulaHtml: `<strong>Materi Level 3 (Gabungan Level 1 dan 2):</strong><br>
+          • Pahami penggunaan awalan <strong>Me-</strong> pada kata berawalan <strong>D, C, G, dan H</strong> sesuai kaidah peluluhan huruf.`,
+      };
+      const bunkerLevel = {
+        ...originalLevels[5],
+        id: 6,
+        name: 'Level 6',
+        locationName: 'Bunker Militer Bawah Tanah',
+        subtitle: 'Gabungan Materi Level 4 dan 5 (B, F, J, Z, L, M, N, R, W & Y)',
+        letters: [...new Set([...originalLevels[2].letters, ...originalLevels[3].letters])],
+        extraAggressive: false,
+        missionDesc: 'Bunker militer rahasia bawah tanah telah ditinggalkan setelah wabah zombie. Lorong beton, ruang komando, ruang komunikasi, gudang perlengkapan, barak tentara, ruang medis, penyimpanan logistik, ruang generator, dan ruang persenjataan kini gelap dan mencekam.',
+        formulaHtml: `<strong>Materi Level 6 (Gabungan Level 4 dan 5):</strong><br>
+          • Pahami penggunaan awalan <strong>Me-</strong> pada kata berawalan <strong>B, F, J, Z, L, M, N, R, W, dan Y</strong>.`,
+        theme: {
+          bg: 0x05080d, fogColor: 0x05080d, fogDensity: 0.043, ambientColor: 0x334155, ambientInt: 0.48,
+          wallTop: '#334155', wallBot: '#111827', wallTrim: '#64748b', wallStyle: 'bunker',
+          floorA: '#374151', floorB: '#1f2937', floorStyle: 'concrete', ceilColor: '#090d16',
+          lights: [
+            { col: 2, row: 12, color: 0xef4444, int: 0.8, flicker: true }, { col: 9, row: 12, color: 0xf59e0b, int: 0.75 },
+            { col: 15, row: 12, color: 0xef4444, int: 0.7, pulse: true }, { col: 3, row: 7, color: 0xf59e0b, int: 0.65, flicker: true },
+            { col: 9, row: 7, color: 0x64748b, int: 0.55 }, { col: 15, row: 7, color: 0xef4444, int: 0.7, pulse: true },
+            { col: 3, row: 2, color: 0xf59e0b, int: 0.65 }, { col: 9, row: 2, color: 0xef4444, int: 0.7, flicker: true },
+            { col: 15, row: 2, color: 0xf59e0b, int: 0.65 }
+          ]
+        },
+        getRoomName(c, r) {
+          if (r >= 11 && c <= 5) return 'Gudang Perlengkapan';
+          if (r >= 11 && c >= 7 && c <= 11) return 'Ruang Komando Militer';
+          if (r >= 11 && c >= 13) return 'Ruang Komunikasi';
+          if (r === 9 || r === 5) return 'Lorong Beton Bawah Tanah';
+          if (r >= 6 && r <= 8 && c <= 5) return 'Barak / Ruang Tidur Tentara';
+          if (r >= 6 && r <= 8 && c >= 7 && c <= 11) return 'Ruang Medis';
+          if (r >= 6 && r <= 8 && c >= 13) return 'Penyimpanan Logistik';
+          if (r <= 3 && c <= 5) return 'Ruang Generator';
+          if (r <= 3 && c >= 7 && c <= 11) return 'Ruang Persenjataan';
+          if (r <= 3 && c >= 13) return 'Pos Pengawasan';
+          return 'Lorong Bunker Militer';
+        }
+      };
+
+      const reorderedLevels = [
+        originalLevels[0], originalLevels[1], cruiseLevel,
+        originalLevels[2], originalLevels[3], bunkerLevel,
+        originalLevels[4], originalLevels[5], originalLevels[6],
+        originalLevels[7], originalLevels[8], originalLevels[9]
+      ];
+      LEVELS.splice(0, LEVELS.length, ...reorderedLevels);
+      LEVELS.forEach((level, index) => {
+        level.id = index + 1;
+        level.name = `Level ${index + 1}`;
+      });
+
+      // ==========================================================
       // 2. AUDIO ENGINE PROSEDURAL
       // ==========================================================
       class SoundEngine {
@@ -1332,6 +1397,13 @@
           ctx.beginPath(); ctx.arc(128, 78, 30, 0, Math.PI * 2); ctx.stroke();
           ctx.fillStyle = '#0c4a6e'; ctx.beginPath(); ctx.arc(128, 78, 26, 0, Math.PI * 2); ctx.fill();
         }
+        else if (theme.wallStyle === 'bunker') {
+          ctx.strokeStyle = 'rgba(148,163,184,0.28)'; ctx.lineWidth = 3;
+          for (let y = 18; y < 240; y += 54) { ctx.strokeRect(12, y, 232, 34); }
+          ctx.fillStyle = 'rgba(239,68,68,0.22)'; ctx.fillRect(0, 214, 256, 18);
+          ctx.strokeStyle = 'rgba(245,158,11,0.55)'; ctx.lineWidth = 5;
+          for (let x = -12; x < 270; x += 28) { ctx.beginPath(); ctx.moveTo(x, 214); ctx.lineTo(x + 18, 232); ctx.stroke(); }
+        }
 
         for (let i = 0; i < 400; i++) {
           ctx.fillStyle = Math.random() > 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.03)';
@@ -1400,8 +1472,69 @@
 
       function buildLevelProps(levelId) {
         const g2w = gridToWorld;
+        const originalPropLevel = ({ 1: 1, 2: 2, 3: 11, 4: 3, 5: 4, 7: 5, 8: 6, 9: 7, 10: 8, 11: 9, 12: 10 })[levelId];
 
-        if (levelId === 1) {
+        if (levelId === 6) {
+          const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.75, roughness: 0.45 });
+          const darkMat = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.45, roughness: 0.65 });
+          const screenMat = new THREE.MeshBasicMaterial({ color: 0x22c55e });
+          // Meja komando dan monitor pengawas
+          [g2w(7, 11), g2w(10, 11)].forEach(p => {
+            const desk = new THREE.Group();
+            const top = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.14, 0.85), steelMat); top.position.y = 0.9;
+            const base = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.82, 0.65), darkMat); base.position.y = 0.42;
+            const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.55, 0.08), screenMat); monitor.position.set(0, 1.28, -0.22);
+            desk.add(top, base, monitor); addSolidProp(desk, p.x, p.z - 0.5, 1.8, 0.9);
+          });
+          // Ranjang susun di barak tentara
+          [g2w(1, 7), g2w(4, 7), g2w(1, 12)].forEach(p => {
+            const bunk = new THREE.Group();
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.12, 0.75), steelMat);
+            const lower = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.18, 0.68), new THREE.MeshStandardMaterial({ color: 0x64748b })); lower.position.y = 0.45;
+            const upper = lower.clone(); upper.position.y = 1.45;
+            const legs = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.55, 0.08), steelMat); legs.position.set(-0.8, 0.78, 0);
+            const legs2 = legs.clone(); legs2.position.x = 0.8;
+            bunk.add(frame, lower, upper, legs, legs2); addSolidProp(bunk, p.x, p.z, 1.8, 0.8);
+          });
+          // Lemari besi dan pintu baja
+          [g2w(14, 11), g2w(17, 11), g2w(14, 2)].forEach(p => {
+            const safe = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.9, 0.65), darkMat); safe.position.y = 0.95;
+            const dial = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 8, 16), steelMat); dial.position.set(0, 1.0, 0.35);
+            const g = new THREE.Group(); g.add(safe, dial); addSolidProp(g, p.x, p.z - 0.65, 1.0, 0.7);
+          });
+          // Panel kontrol generator dan komunikasi
+          [g2w(3, 2), g2w(9, 2), g2w(16, 7)].forEach(p => {
+            const panel = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.7, 0.35), steelMat); body.position.y = 0.85;
+            const light = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.35, 0.05), screenMat); light.position.set(0, 1.2, 0.2);
+            panel.add(body, light); addSolidProp(panel, p.x, p.z - 0.5, 1.1, 0.4);
+          });
+          // Pintu baja tebal pada akses antarruang bunker
+          [g2w(5, 9), g2w(12, 9), g2w(9, 4)].forEach(p => {
+            const door = new THREE.Group();
+            const slab = new THREE.Mesh(new THREE.BoxGeometry(1.35, 2.7, 0.18), steelMat); slab.position.y = 1.35;
+            const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.12), darkMat); handle.position.set(0.48, 1.3, 0.15);
+            const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 12), screenMat); bolt.rotation.x = Math.PI / 2; bolt.position.set(-0.42, 1.35, 0.14);
+            door.add(slab, handle, bolt); addSolidProp(door, p.x, p.z, 1.35, 0.2);
+          });
+          // Rak perlengkapan dan persenjataan
+          [g2w(14, 2), g2w(17, 2)].forEach(p => {
+            const rack = new THREE.Group();
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.9, 0.16), steelMat); frame.position.y = 0.95;
+            const shelf1 = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.1, 0.55), darkMat); shelf1.position.y = 0.55;
+            const shelf2 = shelf1.clone(); shelf2.position.y = 1.25;
+            const equipment = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.22, 0.3), new THREE.MeshStandardMaterial({ color: 0x166534, metalness: 0.5 })); equipment.position.set(0, 1.48, 0.05);
+            rack.add(frame, shelf1, shelf2, equipment); addSolidProp(rack, p.x, p.z - 0.55, 1.75, 0.6);
+          });
+          // Tempat tidur pasien di ruang medis
+          [g2w(8, 7), g2w(10, 7)].forEach(p => {
+            const bed = new THREE.Group();
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.18, 0.75), steelMat); frame.position.y = 0.5;
+            const mattress = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.16, 0.7), new THREE.MeshStandardMaterial({ color: 0xd1d5db })); mattress.position.y = 0.62;
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.65, 0.8), steelMat); head.position.set(-0.82, 0.7, 0);
+            bed.add(frame, mattress, head); addSolidProp(bed, p.x, p.z, 1.75, 0.8);
+          });
+        } else if (originalPropLevel === 1) {
           const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.6, roughness: 0.4 });
           const sheetMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.85 });
           const curtainMat = new THREE.MeshStandardMaterial({ color: 0x5eead4, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
@@ -1430,7 +1563,7 @@
             const cH = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.04), new THREE.MeshBasicMaterial({ color: 0xef4444 })); cH.position.set(0, 1.45, 0.28);
             cab.add(body, cV, cH); addSolidProp(cab, pos.x - 0.8, pos.z - 0.9, 1.1, 0.6);
           });
-        } else if (levelId === 2) {
+        } else if (originalPropLevel === 2) {
           const woodMat = new THREE.MeshStandardMaterial({ color: 0x854d0e, roughness: 0.75 });
           const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5 });
           const boardMat = new THREE.MeshStandardMaterial({ color: 0x14532d, roughness: 0.8 });
@@ -1458,7 +1591,7 @@
             const lk = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.1, 0.55), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5, metalness: 0.4 }));
             lk.position.y = 1.05; addSolidProp(lk, p.x, p.z - 1.1, 1.8, 0.6);
           });
-        } else if (levelId === 3) {
+        } else if (originalPropLevel === 3) {
           const metalMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.7, roughness: 0.3 });
           const glassMat = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.4 });
           const escSpot = g2w(9, 6), esc = new THREE.Group();
@@ -1493,7 +1626,7 @@
             const sm = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({ map: makeSignTexture(s.text, s.bg, s.fg), side: THREE.DoubleSide }));
             sm.position.set(p.x, WALL_HEIGHT - 0.55, p.z); worldGroup.add(sm);
           });
-        } else if (levelId === 4) {
+        } else if (originalPropLevel === 4) {
           const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.8, roughness: 0.25 });
           const velvetMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.85 });
           const mahoMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.6 });
@@ -1525,7 +1658,7 @@
             const w = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 0.6), mahoMat); w.position.y = 1.1;
             addSolidProp(w, p.x + 0.6, p.z - 0.8, 1.1, 0.6);
           });
-        } else if (levelId === 5) {
+        } else if (originalPropLevel === 5) {
           const techMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.3 });
           const glassCyan = new THREE.MeshStandardMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.42 });
           const bioGlow = new THREE.MeshBasicMaterial({ color: 0x4ade80 });
@@ -1552,7 +1685,7 @@
             const arch = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, 0.25, 0.35), new THREE.MeshBasicMaterial({ color: 0x06b6d4 }));
             arch.position.set(p.x, WALL_HEIGHT - 0.2, p.z); worldGroup.add(arch);
           });
-        } else if (levelId === 6) {
+        } else if (originalPropLevel === 6) {
           const ironMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.85, roughness: 0.35 });
           const benchMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.6 });
           [g2w(2, 3), g2w(10, 3), g2w(15, 3)].forEach(p => {
@@ -1577,7 +1710,7 @@
             const led = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), new THREE.MeshBasicMaterial({ color: 0xef4444 })); led.position.set(0, 0.05, 0.2);
             cctv.add(cam, led); cctv.position.set(p.x, WALL_HEIGHT - 0.35, p.z); worldGroup.add(cctv);
           });
-        } else if (levelId === 7) {
+        } else if (originalPropLevel === 7) {
           const rustMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.85, metalness: 0.4 });
           const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.4 });
           const yellowMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.5 });
@@ -1606,7 +1739,7 @@
             const p = g2w(9, row), oh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 52, 8), rustMat);
             oh.rotation.z = Math.PI / 2; oh.position.set(p.x, WALL_HEIGHT - 0.25, p.z); worldGroup.add(oh);
           });
-        } else if (levelId === 8) {
+        } else if (originalPropLevel === 8) {
           // LEVEL 8: BANDARA INTERNASIONAL TERBENGKALAI
           const deskMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.5 });
           const chairMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.6 });
@@ -1648,7 +1781,7 @@
             const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshBasicMaterial({ map: makeSignTexture('FLIGHT: DELAYED', '#020617', '#fbbf24'), side: THREE.DoubleSide }));
             sign.position.set(p.x, WALL_HEIGHT - 0.6, p.z); worldGroup.add(sign);
           });
-        } else if (levelId === 9) {
+        } else if (originalPropLevel === 9) {
           // LEVEL 9: STASIUN KERETA BAWAH TANAH
           const steelMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.75, roughness: 0.35 });
           const trainMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.6, roughness: 0.45 });
@@ -1686,7 +1819,7 @@
             const sm = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.65), new THREE.MeshBasicMaterial({ map: makeSignTexture('KERETA: BERHENTI', '#18181b', '#f97316'), side: THREE.DoubleSide }));
             sm.position.set(p.x, WALL_HEIGHT - 0.55, p.z); worldGroup.add(sm);
           });
-        } else if (levelId === 10) {
+        } else if (originalPropLevel === 10) {
           // LEVEL 10: MUSEUM SEJARAH TERBENGKALAI
           const woodMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 });
           const stoneMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.8 });
@@ -1725,7 +1858,7 @@
             const frame = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.3, 0.08), goldMat); frame.position.set(p.x, 1.85, p.z + 1.65); worldGroup.add(frame);
             const art = new THREE.Mesh(new THREE.BoxGeometry(1.75, 1.05, 0.1), new THREE.MeshStandardMaterial({ color: 0x7c2d12 })); art.position.set(p.x, 1.85, p.z + 1.64); worldGroup.add(art);
           });
-        } else if (levelId === 11) {
+        } else if (originalPropLevel === 11) {
           // LEVEL 11: KAPAL PESIAR TERBENGKALAI
           const goldMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8, roughness: 0.25 });
           const velvetMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.8 });
@@ -2710,4 +2843,3 @@
   </script>
 </body>
 </html>
-```
