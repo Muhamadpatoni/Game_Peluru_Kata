@@ -599,7 +599,7 @@
         <ul>
           <li>Permainan <strong>tetap berjalan</strong> saat kamu memilih jawaban. Jika zombie mendekat, <strong>alarm merah akan berkedip</strong>.</li>
           <li>Setiap zombie membutuhkan <strong>2 tembakan</strong> untuk tumbang.</li>
-          <li>Selesaikan secepatnya! Makin lama zombie makin agresif, dan setelah waktu <strong>lebih dari 5 menit</strong> semua zombie akan mengejarmu secara agresif (khusus Level 11, zombie sudah lebih agresif sejak awal!).</li>
+          <li>Selesaikan secepatnya! Makin lama zombie makin agresif, dan setelah waktu <strong>lebih dari 5 menit</strong> semua zombie akan mengejarmu secara agresif.</li>
         </ul>
       </div>
       <div class="info-box">
@@ -968,9 +968,9 @@
         },
         {
           id: 8, name: 'Level 8', locationName: 'Bandara Internasional Terbengkalai',
-          subtitle: 'Gabungan Materi Level 1–3 (D, C, G, H, B, F, J, Z)', letters: ALL_L1_3, extraAggressive: false,
+          subtitle: 'Gabungan Materi Level 1, 2, dan 4 (D, C, G, H, B, F, J, Z)', letters: ALL_L1_3, extraAggressive: false,
           missionDesc: 'Bandara internasional yang luas ini gelap, berantakan, dan ditinggalkan akibat wabah zombie.',
-          formulaHtml: `<strong>Rumus Level 8 (Gabungan Level 1 – 3):</strong><br>
+          formulaHtml: `<strong>Rumus Level 10 (Gabungan Level 1, 2, dan 4):</strong><br>
             • <strong>D, C, J, Z</strong> memunculkan <strong>N</strong> (men-): <em>MeNdaki, MeNcapai, MeNjaga, MeNziarah</em>.<br>
             • <strong>G, H</strong> memunculkan <strong>NG</strong> (meng-): <em>MeNGgali, MeNGhitung</em>.<br>
             • <strong>B, F</strong> memunculkan <strong>M</strong> (mem-): <em>MeMbaca, MeMfoto</em>.`,
@@ -1008,12 +1008,11 @@
         },
         {
           id: 9, name: 'Level 9', locationName: 'Stasiun Kereta Bawah Tanah',
-          subtitle: 'Gabungan Materi Level 1–5 (Termasuk K & T)', letters: ALL_L1_5, extraAggressive: false,
+          subtitle: 'Gabungan Materi Level 1, 2, 4, dan 5', letters: ['d', 'c', 'g', 'h', 'b', 'f', 'j', 'z', 'l', 'm', 'n', 'r', 'w', 'y'], extraAggressive: false,
           missionDesc: 'Stasiun bawah tanah ini gelap, lembap, sempit, dan hanya diterangi lampu darurat.',
-          formulaHtml: `<strong>Rumus Level 9 (Gabungan Level 1 – 5):</strong><br>
+          formulaHtml: `<strong>Rumus Level 11 (Gabungan Level 1, 2, 4, dan 5):</strong><br>
             • <strong>D, C, J, Z</strong> → <strong>men-</strong> | <strong>G, H</strong> → <strong>meng-</strong> | <strong>B, F</strong> → <strong>mem-</strong> (tidak luluh).<br>
-            • <strong>L, M, N, R, W, Y</strong> → tetap <strong>me-</strong> (<em>Melihat, Memakan</em>).<br>
-            • <strong>K &amp; T</strong> → <strong>LULUH</strong>: <strong>K → NG</strong> (<em>MeNGiwi</em>), <strong>T → N</strong> (<em>MeNuba</em>).`,
+            • <strong>L, M, N, R, W, Y</strong> → tetap <strong>me-</strong> (<em>Melihat, Memakan</em>).`,
           theme: {
             bg: 0x040507, fogColor: 0x040507, fogDensity: 0.046, ambientColor: 0x3f4756, ambientInt: 0.56,
             wallTop: '#64748b', wallBot: '#1e293b', wallTrim: '#f59e0b', wallStyle: 'subway',
@@ -1049,9 +1048,9 @@
         },
         {
           id: 10, name: 'Level 10', locationName: 'Museum Sejarah Terbengkalai',
-          subtitle: 'Gabungan Materi Level 1–7 (Semua Huruf)', letters: ALL_L1_7, extraAggressive: false,
+          subtitle: 'Gabungan Materi Level 1, 2, 4, 5, dan 9 (Semua Huruf)', letters: ALL_L1_7, extraAggressive: false,
           missionDesc: 'Museum megah yang sunyi dan berdebu ini kini penuh pajangan rusak serta zombie.',
-          formulaHtml: `<strong>Rumus Level 10 (Semua Materi Level 1 – 7):</strong><br>
+          formulaHtml: `<strong>Rumus Level 12 (Gabungan Level 1, 2, 4, 5, dan 9):</strong><br>
             • <strong>Tak Luluh:</strong> D,C,J,Z → <strong>men-</strong> | G,H → <strong>meng-</strong> | B,F → <strong>mem-</strong>.<br>
             • <strong>Tetap:</strong> L,M,N,R,W,Y → <strong>me-</strong>.<br>
             • <strong>Luluh:</strong> K → <strong>meng-</strong> | T → <strong>men-</strong> | S → <strong>meny-</strong> | P → <strong>mem-</strong>.`,
